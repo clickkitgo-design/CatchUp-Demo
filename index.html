@@ -1,0 +1,2071 @@
+<!DOCTYPE html>
+<html lang="en" data-accent="academia" data-mode="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CatchUp Planner — Demo</title>
+<meta name="description" content="CatchUp Planner: a calm exam catch-up planner with balanced study days, streaks and a focus timer. Works offline, your data stays in your browser.">
+<meta name="theme-color" content="#141A17">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23141A17'/%3E%3Cpath d='M12 4.8L13.5 10.5 19.2 12 13.5 13.5 12 19.2 10.5 13.5 4.8 12 10.5 10.5z' fill='%23C9A96A'/%3E%3C/svg%3E">
+<script>
+/* Apply saved theme before first paint (no flash). Reads the same LS key the app uses. */
+(function(){
+  var r=document.documentElement;
+  try{
+    var s=JSON.parse(localStorage.getItem('catchup-planner.v1')||'{}');
+    var t=(s.theme==='scandinavian'||s.theme==='cozy')?s.theme:'academia';
+    r.dataset.accent=t;
+    if(t==='academia'){ r.dataset.mode='dark'; }
+    else{
+      var m=s.mode||'auto';
+      var dark = m==='dark' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=dark?'dark':'light';
+    }
+  }catch(e){ r.dataset.accent='academia'; r.dataset.mode='dark'; }
+})();
+</script>
+<style>
+/* ==========================================================================
+   CatchUp Planner — single-file app
+   1. Base tokens (defaults = Modern Dark Academia)
+   2. Base components (read tokens only)
+   3. THEME: academia   4. THEME: scandinavian   5. THEME: cozy
+   6. Responsive   7. Print / motion
+   ========================================================================== */
+
+/* ---------- 1. BASE TOKENS ---------- */
+:root{
+  --font-head:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+  --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --r:6px; --r-btn:6px;
+  --bg:#141A17; --bg-glow:radial-gradient(640px 420px at 86% -6%, rgba(42,58,47,.6), transparent 70%);
+  --text:#EFE3C4; --muted:#A8A08A;
+  --panel:#1D2522; --panel-2:#19211E;
+  --line:rgba(239,227,196,.14); --hairline:rgba(239,227,196,.18);
+  --accent:#AD9565; --accent-strong:#C9A96A; --accent-ink:#241D10;
+  --primary:#542B3A; --primary-strong:#6A3850; --primary-ink:#F2E4D5;
+  --p-bg:linear-gradient(180deg,#F1E8D5,#EBDFC6); --p-ink:#26231C; --p-muted:#6E6654; --p-line:rgba(38,35,28,.16); --p-border:#D3C6A8;
+  --ok:#7C8F6B; --ok-ink:#9DB48A; --warn:#C9A66B; --danger:#B05A64; --danger-bg:rgba(176,90,100,.16);
+  --nav-bg:#0B100D; --nav-line:rgba(173,149,101,.4);
+  --chip-bg:rgba(173,149,101,.1);
+  --shadow-card:none; --shadow-pop:0 18px 50px rgba(0,0,0,.5);
+  --track:rgba(124,143,107,.35);
+  color-scheme:dark;
+}
+html[data-accent="scandinavian"]{ color-scheme:light; }
+html[data-accent="cozy"]{ color-scheme:light; }
+html[data-accent="scandinavian"][data-mode="dark"]{ color-scheme:dark; }
+html[data-accent="cozy"][data-mode="dark"]{ color-scheme:dark; }
+
+/* ---------- 2. BASE ---------- */
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  font-family:var(--font-body); background:var(--bg); background-image:var(--bg-glow);
+  color:var(--text); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  min-height:100vh;
+}
+img,svg{ display:block; }
+button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+input,textarea,select{ font:inherit; color:inherit; }
+h1,h2,h3,h4,p{ margin:0; }
+.num{ font-variant-numeric:tabular-nums; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+.wrap{ max-width:1060px; margin:0 auto; padding:0 18px calc(96px + env(safe-area-inset-bottom)); }
+.screen{ display:none; }
+.screen.active{ display:block; animation:fadeIn .24s ease; }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none;} }
+
+/* Demo bar */
+.demo-bar{ background:var(--nav-bg); color:var(--muted); border-bottom:1px solid var(--nav-line); font-size:.74rem; text-align:center; padding:6px 12px; }
+.demo-bar button{ color:var(--accent-strong); font-weight:600; text-decoration:underline; min-height:0; padding:0 4px; font-size:inherit; }
+
+/* Top bar */
+.topbar{
+  position:sticky; top:0; z-index:40;
+  background:var(--topbar-bg,var(--nav-bg));
+  border-bottom:1px solid var(--topbar-line,var(--nav-line));
+}
+.topbar-in{
+  max-width:1060px; margin:0 auto; padding:10px 18px;
+  display:flex; align-items:center; gap:10px;
+}
+.brand{ display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; }
+.brand .logo{ width:38px; height:38px; flex:0 0 auto; }
+.brand-name{ line-height:1.05; min-width:0; }
+.brand-name b{ font-family:var(--font-head); font-weight:600; font-size:1.16rem; letter-spacing:.01em; display:block; white-space:nowrap; }
+.brand-name span{ font-size:.52rem; letter-spacing:.34em; text-transform:uppercase; color:var(--muted); display:block; margin-top:2px; }
+.topbar-right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+.streak-chip{
+  display:inline-flex; align-items:center; gap:7px; min-height:38px;
+  padding:5px 12px 5px 9px; border:1px solid var(--accent); border-radius:var(--r-btn);
+  background:var(--chip-bg); color:var(--accent-strong);
+}
+.streak-chip svg{ width:17px; height:17px; color:#D98E5A; }
+.streak-chip b{ font-family:var(--font-head); font-size:1.02rem; line-height:1; }
+.streak-chip small{ font-size:.5rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); display:block; }
+.icon-btn{
+  width:44px; height:44px; border-radius:var(--r-btn);
+  display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+  border:1px solid transparent; color:var(--text); transition:background .15s ease,border-color .15s ease;
+}
+.icon-btn:hover{ background:var(--chip-bg); }
+.icon-btn svg{ width:20px; height:20px; }
+.icon-btn.lined{ border-color:var(--hairline); }
+
+/* Buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
+  min-height:46px; padding:0 1.1rem; border-radius:var(--r-btn);
+  font-weight:600; font-size:.92rem; letter-spacing:.01em; white-space:nowrap;
+  border:1px solid transparent; transition:filter .15s ease,background .15s ease,transform .06s ease;
+}
+.btn:active{ transform:translateY(1px); }
+.btn svg{ width:18px; height:18px; flex:0 0 auto; }
+.btn-primary{ background:var(--primary); color:var(--primary-ink); }
+.btn-primary:hover{ background:var(--primary-strong); }
+.btn-accent{ background:var(--accent-strong); color:var(--accent-ink); }
+.btn-accent:hover{ filter:brightness(1.05); }
+.btn-dark{ background:var(--btn-dark-bg,#24413A); color:var(--btn-dark-ink,#EFE3C4); border-color:var(--btn-dark-line,#3E5D4F); }
+.btn-outline{ border-color:var(--accent); color:var(--accent-strong); background:transparent; }
+.btn-outline:hover{ background:var(--chip-bg); }
+.btn-ghost{ color:var(--text); background:var(--chip-bg); }
+.btn-ghost:hover{ filter:brightness(1.08); }
+.btn-text{ color:var(--accent-strong); min-height:44px; padding:0 .5rem; font-weight:600; }
+.btn-danger{ color:var(--danger); border-color:var(--danger); background:transparent; }
+.btn-sm{ min-height:38px; padding:0 .8rem; font-size:.85rem; }
+.btn-block{ width:100%; }
+
+/* Eyebrow / masthead */
+.eyebrow{
+  display:flex; align-items:center; gap:10px;
+  font-size:.66rem; font-weight:600; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--accent-strong);
+}
+.eyebrow::after{ content:''; width:34px; height:1px; background:var(--accent); opacity:.7; }
+.masthead{ position:relative; padding:26px 0 8px; }
+.mast-eyebrow{ margin-bottom:10px; }
+.headline{
+  font-family:var(--font-head); font-weight:600; letter-spacing:-.01em; line-height:1.08;
+  font-size:clamp(1.9rem,6.4vw,2.55rem); max-width:24ch;
+}
+.mast-sub{ margin-top:10px; color:var(--muted); font-size:.95rem; max-width:52ch; }
+.mast-meta{
+  display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center;
+  font-size:.76rem; color:var(--muted); margin-bottom:12px; letter-spacing:.02em;
+}
+.mast-meta b{ color:var(--text); font-weight:600; }
+.mast-meta .dot{ width:3px; height:3px; border-radius:50%; background:var(--muted); opacity:.7; }
+.mast-illus{
+  position:absolute; right:-12px; top:6px; width:min(46%,300px); pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 26%); mask-image:linear-gradient(90deg,transparent,#000 26%);
+}
+@media (max-width:719px){ .mast-illus{ width:40%; top:16px; opacity:.9; } .masthead .headline,.masthead .mast-sub{ max-width:78%; } }
+.mast-actions{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 4px; position:relative; z-index:2; }
+
+/* Chapter title w/ hairline */
+.chapter{ display:flex; align-items:baseline; gap:12px; margin:26px 0 4px; }
+.chapter h2{ font-family:var(--font-head); font-weight:600; font-size:1.3rem; letter-spacing:.01em; white-space:nowrap; }
+.chapter .rule{ flex:1; height:1px; background:var(--hairline); align-self:center; }
+.chapter .aux{ font-size:.75rem; color:var(--muted); white-space:nowrap; }
+
+/* Panels */
+.panel{
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  padding:18px; position:relative;
+}
+.panel + .panel{ margin-top:14px; }
+.panel-h{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.panel-h .pic{ width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:var(--chip-bg); color:var(--accent-strong); }
+.panel-h .pic svg{ width:18px; height:18px; }
+.panel-h h3{ font-family:var(--font-head); font-weight:600; font-size:1.22rem; letter-spacing:.01em; flex:1; }
+.panel-h .side{ font-size:.8rem; color:var(--muted); }
+.panel.parchment{ background:var(--p-bg); border-color:var(--p-border); color:var(--p-ink); }
+.panel.parchment .panel-h .pic{ background:rgba(84,43,58,.1); color:#542B3A; }
+.panel.parchment .panel-h .side,.panel.parchment .muted{ color:var(--p-muted); }
+
+/* Metric rows */
+.metric-row{ display:grid; gap:0; }
+.metric{ display:flex; align-items:center; gap:12px; padding:10px 2px; }
+.metric + .metric{ border-top:1px solid var(--p-line); }
+.metric svg{ width:20px; height:20px; color:var(--accent); flex:0 0 auto; }
+.metric.parchment svg{ color:#8A7448; }
+.metric .lbl{ font-size:.86rem; color:var(--muted); flex:1; min-width:0; }
+.metric.parchment .lbl{ color:var(--p-muted); }
+.metric .val{ font-family:var(--font-head); font-weight:600; font-size:1.45rem; line-height:1; white-space:nowrap; }
+.metric .val small{ font-size:.8rem; font-weight:400; font-family:var(--font-body); color:var(--muted); margin-left:2px; }
+
+/* Progress bars */
+.bar{ height:10px; border-radius:99px; background:var(--track); overflow:hidden; position:relative; }
+.bar > i{ display:block; height:100%; border-radius:99px; background:var(--accent-strong); transition:width .4s ease; }
+.bar.knob::before{
+  content:''; position:absolute; top:50%; left:0; width:14px; height:14px; border-radius:50%;
+  background:var(--accent-strong); transform:translate(-2px,-50%); transition:left .4s ease;
+}
+.bar.thin{ height:4px; }
+.bar.thin > i{ background:var(--accent-strong); }
+.prog-caption{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:8px; font-size:.82rem; color:var(--muted); }
+.prog-caption .big{ font-family:var(--font-head); font-size:1.35rem; color:var(--text); font-weight:600; }
+.prog-caption .big small{ display:block; font-family:var(--font-body); font-size:.72rem; color:var(--muted); font-weight:400; }
+
+/* Chips */
+.chip{
+  display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:99px;
+  font-size:.72rem; font-weight:600; letter-spacing:.02em; background:var(--chip-bg); color:var(--muted);
+  border:1px solid var(--line); white-space:nowrap;
+}
+.chip .cdot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+.chip.ok{ color:var(--ok-ink); border-color:rgba(124,143,107,.4); background:rgba(124,143,107,.12); }
+.chip.warn{ color:var(--warn); border-color:rgba(201,166,107,.4); background:rgba(201,166,107,.12); }
+.chip.bad{ color:var(--danger); border-color:rgba(176,90,100,.45); background:var(--danger-bg); }
+.tagchip{ font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; font-weight:700; }
+
+/* Rating segments */
+.segs{ display:inline-flex; gap:3px; align-items:center; }
+.segs i{ width:9px; height:9px; border-radius:2px; background:var(--track); }
+.segs i.on{ background:var(--accent-strong); }
+
+/* Session list rows */
+.slist{ display:flex; flex-direction:column; }
+.srow{
+  display:grid; grid-template-columns:2.1rem 1fr auto; gap:10px; align-items:center;
+  padding:11px 2px; border-bottom:1px solid var(--line); min-height:52px; width:100%; text-align:left;
+}
+.srow:last-child{ border-bottom:0; }
+.srow .seq{ font-family:var(--font-head); font-style:italic; font-size:1.02rem; color:var(--accent-strong); }
+.srow .st{ min-width:0; }
+.srow .st b{ display:block; font-size:.95rem; font-weight:600; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.srow .st small{ display:block; font-size:.74rem; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.srow .st small .subj{ color:var(--accent-strong); font-weight:600; }
+.srow.done{ opacity:.52; }
+.srow.done .st b{ text-decoration:line-through; font-weight:500; }
+.srow.urgent{ box-shadow:inset 3px 0 0 var(--danger); padding-left:10px; border-radius:2px; }
+.donebtn{
+  width:44px; height:44px; border-radius:50%; border:1.6px solid var(--line);
+  display:inline-flex; align-items:center; justify-content:center; color:var(--muted);
+  flex:0 0 auto; transition:all .15s ease;
+}
+.donebtn svg{ width:18px; height:18px; }
+.donebtn:hover{ border-color:var(--accent-strong); color:var(--accent-strong); }
+.donebtn.on{ background:var(--ok); border-color:var(--ok); color:#141A17; }
+
+/* Exam readiness rows */
+.exrows{ display:flex; flex-direction:column; }
+.exrow{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:12px 2px; border-bottom:1px solid var(--line); min-height:56px; }
+.exrow:last-child{ border-bottom:0; }
+.exrow.urgent{ box-shadow:inset 3px 0 0 var(--danger); padding-left:10px; border-radius:2px; }
+.exrow .cdot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+.exrow .nm{ flex:1; min-width:120px; }
+.exrow .nm b{ display:block; font-size:.96rem; font-weight:600; }
+.exrow .nm small{ color:var(--muted); font-size:.74rem; }
+.exrow .cov{ font-size:.86rem; color:var(--muted); white-space:nowrap; }
+.exrow .cov b{ color:var(--text); font-size:1rem; }
+@media (max-width:719px){
+  .exrow{ display:grid; grid-template-columns:auto 1fr auto; grid-template-rows:auto auto; gap:6px 12px; align-items:center; }
+  .exrow .cdot{ grid-row:1; align-self:start; margin-top:5px; }
+  .exrow .exam-tile{ grid-row:1 / span 2; align-self:center; }
+  .exrow .nm{ grid-column:2; grid-row:1; }
+  .exrow .cov{ grid-column:3; grid-row:1; text-align:right; }
+  .exrow .chip{ grid-column:2; grid-row:2; justify-self:start; }
+  .exrow .segs{ grid-column:3; grid-row:2; justify-self:end; }
+}
+
+/* Hero cards (layered) */
+.hero-cards{ position:relative; margin-top:18px; display:flex; flex-direction:column; }
+.card{ border-radius:var(--r); padding:20px; position:relative; }
+.card-start{ background:var(--panel); border:1px solid var(--line); }
+.card-start.parchment{ background:var(--p-bg); border-color:var(--p-border); color:var(--p-ink); }
+.card-progress{ background:var(--panel); border:1px solid var(--accent); width:min(88%,360px); margin:-1.5rem 0 0 auto; z-index:2; box-shadow:var(--shadow-card); }
+.card-kicker{ font-size:.62rem; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--accent-strong); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.card-kicker::after{ content:''; flex:1; height:1px; background:var(--hairline); }
+.sess-title{ font-family:var(--font-head); font-weight:600; font-size:1.42rem; line-height:1.18; letter-spacing:.005em; }
+.sess-meta{ display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:.8rem; color:var(--muted); align-items:center; }
+.quote{
+  margin:12px 0 2px; padding:8px 12px; border-left:2px solid var(--accent);
+  font-family:var(--font-head); font-style:italic; font-size:.92rem; color:inherit; opacity:.85;
+}
+.card-btns{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.bigstat{ font-family:var(--font-head); font-weight:600; font-size:1.85rem; line-height:1; }
+.bigstat small{ font-size:.95rem; font-weight:400; color:var(--muted); }
+.mini-rows{ margin-top:12px; display:flex; flex-direction:column; }
+.mini-row{ display:flex; justify-content:space-between; gap:10px; font-size:.8rem; padding:7px 0; border-bottom:1px solid var(--line); color:var(--muted); }
+.mini-row:last-child{ border-bottom:0; }
+.mini-row b{ color:var(--text); font-weight:600; }
+
+/* Empty state */
+.empty{ text-align:center; padding:44px 18px 30px; }
+.empty .illus svg{ width:130px; height:96px; margin:0 auto 14px; opacity:.9; }
+.empty h3{ font-family:var(--font-head); font-size:1.35rem; font-weight:600; }
+.empty p{ color:var(--muted); font-size:.92rem; max-width:42ch; margin:8px auto 18px; }
+.empty .card-btns{ justify-content:center; }
+
+/* Forms */
+.field{ margin-bottom:14px; }
+.field label{ display:block; font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.field input[type=text],.field input[type=date],.field input[type=number],.field textarea,select{
+  width:100%; min-height:46px; background:transparent; border:1px solid var(--line);
+  border-radius:var(--r-btn); padding:10px 12px; color:var(--text);
+}
+.panel.parchment .field input,.panel.parchment .field textarea{ border-color:var(--p-line); color:var(--p-ink); }
+.field textarea{ min-height:84px; resize:vertical; }
+.field input:focus,.field textarea:focus{ outline:none; border-color:var(--accent-strong); }
+.swatches{ display:flex; gap:10px; flex-wrap:wrap; }
+.swatch{ width:38px; height:38px; border-radius:50%; border:2px solid transparent; position:relative; }
+.swatch.on{ border-color:var(--text); }
+.swatch.on::after{ content:''; position:absolute; inset:5px; border-radius:50%; border:2px solid var(--bg); }
+.seg{ display:inline-flex; border:1px solid var(--line); border-radius:var(--r-btn); overflow:hidden; }
+.seg button{ min-height:44px; padding:0 14px; font-size:.84rem; font-weight:600; color:var(--muted); }
+.seg button.on{ background:var(--chip-bg); color:var(--text); }
+.switch{ position:relative; width:50px; height:28px; border-radius:99px; background:var(--track); border:1px solid var(--line); flex:0 0 auto; transition:background .2s ease; }
+.switch::after{ content:''; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:var(--muted); transition:all .2s ease; }
+.switch.on{ background:var(--ok); }
+.switch.on::after{ left:24px; background:#fff; }
+.setrow{ display:flex; align-items:center; gap:14px; padding:14px 2px; border-bottom:1px solid var(--line); }
+.setrow:last-child{ border-bottom:0; }
+.setrow .info{ flex:1; min-width:0; }
+.setrow .info b{ display:block; font-size:.95rem; font-weight:600; }
+.setrow .info small{ color:var(--muted); font-size:.78rem; display:block; margin-top:2px; }
+
+/* Theme cards */
+.themecards{ display:grid; gap:12px; }
+.themecard{
+  text-align:left; border:1px solid var(--line); border-radius:var(--r); padding:14px;
+  display:flex; gap:14px; align-items:center; transition:border-color .15s ease; background:var(--panel-2);
+}
+.themecard.on{ border-color:var(--accent-strong); }
+.themecard .prev{ width:74px; height:58px; border-radius:6px; flex:0 0 auto; position:relative; overflow:hidden; border:1px solid var(--line); }
+.themecard .prev i{ position:absolute; border-radius:2px; }
+.themecard b{ display:block; font-size:.98rem; }
+.themecard small{ color:var(--muted); font-size:.78rem; display:block; margin-top:2px; }
+.themecard .tick{ margin-left:auto; width:26px; height:26px; border-radius:50%; border:1.4px solid var(--line); display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.themecard.on .tick{ background:var(--accent-strong); border-color:var(--accent-strong); color:var(--accent-ink); }
+.themecard .tick svg{ width:14px; height:14px; }
+
+/* Chart */
+.chart-wrap svg{ width:100%; height:auto; }
+.legend{ display:flex; gap:14px; font-size:.76rem; color:var(--muted); align-items:center; flex:0 0 auto; }
+.legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
+.legend .lp i{ background:var(--chart-planned,#C9A96A); }
+.legend .lc i{ background:var(--chart-done,#6E8464); }
+
+/* Bottom nav */
+.bottomnav{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  background:var(--nav-bg); border-top:1px solid var(--nav-line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav-in{ max-width:640px; margin:0 auto; display:grid; grid-template-columns:repeat(5,1fr); position:relative; }
+.nav-btn{
+  min-height:58px; padding:8px 2px 9px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--muted); font-size:.66rem; font-weight:600; letter-spacing:.03em; position:relative;
+  -webkit-tap-highlight-color:transparent;
+}
+.nav-btn svg{ width:21px; height:21px; }
+.nav-btn.on{ color:var(--accent-strong); }
+.navleaf{ position:absolute; top:6px; width:20px; height:34px; color:var(--accent); opacity:.4; pointer-events:none; }
+.navleaf.l{ left:6px; } .navleaf.r{ right:6px; transform:scaleX(-1); }
+
+/* Modal */
+.modal-overlay{
+  position:fixed; inset:0; z-index:60; background:rgba(8,12,9,.62);
+  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+  display:flex; align-items:flex-end; justify-content:center; padding:16px;
+}
+html[data-accent="scandinavian"] .modal-overlay,html[data-accent="cozy"] .modal-overlay{ align-items:center; }
+@media (min-width:560px){ .modal-overlay{ align-items:center; } }
+.modal-overlay[hidden]{ display:none; }
+.modal{
+  width:100%; max-width:440px; max-height:86vh; overflow:auto;
+  background:var(--modal-bg,var(--panel)); color:var(--modal-ink,var(--text));
+  border:1px solid var(--line); border-radius:calc(var(--r) + 4px);
+  padding:20px; box-shadow:var(--shadow-pop); animation:pop .22s ease;
+}
+@keyframes pop{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:none;} }
+.modal-h{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.modal-h h3{ font-family:var(--font-head); font-size:1.25rem; font-weight:600; flex:1; }
+.modal .x{ margin:-6px -6px 0 0; }
+.modal-foot{ display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+.modal-foot .btn{ flex:1; }
+.checkrow{ display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); }
+.checkrow:last-child{ border-bottom:0; }
+.checkrow .box{
+  width:30px; height:30px; border-radius:6px; border:1.6px solid var(--line); flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center; color:transparent;
+}
+.checkrow .box.on{ background:var(--ok); border-color:var(--ok); color:#141A17; }
+.checkrow .box svg{ width:14px; height:14px; }
+.checkrow span{ flex:1; font-size:.92rem; min-width:0; }
+.checkrow .box.on + span{ color:var(--muted); text-decoration:line-through; }
+.addcheck{ display:flex; gap:8px; margin-top:10px; }
+.addcheck input{ flex:1; min-height:42px; background:transparent; border:1px solid var(--line); border-radius:var(--r-btn); padding:8px 12px; color:inherit; }
+
+/* Focus timer */
+.timer-big{ font-family:var(--font-head); font-weight:600; font-size:3.4rem; text-align:center; letter-spacing:.02em; margin:10px 0 2px; }
+.timer-sub{ text-align:center; color:var(--muted); font-size:.85rem; margin-bottom:16px; }
+
+/* Toast */
+.toast-wrap{ position:fixed; left:0; right:0; bottom:calc(76px + env(safe-area-inset-bottom)); display:flex; justify-content:center; z-index:70; pointer-events:none; padding:0 16px; }
+.toast{
+  background:var(--toast-bg,#2A342C); color:var(--toast-ink,#EFE3C4); border:1px solid var(--accent);
+  border-radius:8px; padding:11px 18px; font-size:.88rem; font-weight:500; max-width:92%;
+  box-shadow:0 10px 30px rgba(0,0,0,.4); animation:pop .2s ease;
+}
+.muted{ color:var(--muted); }
+.tiny{ font-size:.74rem; }
+.hr{ height:1px; background:var(--line); border:0; margin:14px 0; }
+
+/* ==========================================================================
+   3. THEME — MODERN DARK ACADEMIA (always dark)
+   Dark cinematic masthead, parchment panels w/ ink, gold hairlines,
+   burgundy primary buttons, chapter titles, leaf-sprig nav.
+   ========================================================================== */
+html[data-accent="academia"]{
+  --toast-bg:#242E27; --toast-ink:#EFE3C4; --modal-bg:#1D2522; --modal-ink:#EFE3C4;
+  --btn-dark-bg:#24413A; --btn-dark-ink:#EFE3C4; --btn-dark-line:#3E5D4F;
+}
+html[data-accent="academia"] .brand-name b{ color:var(--accent-strong); }
+html[data-accent="academia"] .topbar{ background:linear-gradient(180deg,#0E1411,#0B100D); }
+html[data-accent="academia"] .masthead{ padding-top:24px; }
+html[data-accent="academia"] .headline{ font-style:normal; }
+html[data-accent="academia"] .mast-sub{ font-family:var(--font-head); font-style:italic; font-size:1.02rem; color:#CBBF9E; }
+html[data-accent="academia"] .mast-illus{ width:min(52%,340px); top:-4px; opacity:.96; }
+
+/* Hero cards */
+html[data-accent="academia"] .card-start.parchment{ box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 8px 24px rgba(0,0,0,.28); }
+html[data-accent="academia"] .card-start .card-kicker{ color:#8A7448; }
+html[data-accent="academia"] .card-start .card-kicker::after{ background:rgba(38,35,28,.2); }
+html[data-accent="academia"] .card-start .sess-meta{ color:var(--p-muted); }
+html[data-accent="academia"] .card-start .donebtn{ border-color:rgba(38,35,28,.3); color:var(--p-muted); }
+html[data-accent="academia"] .card-start .donebtn:hover{ border-color:#542B3A; color:#542B3A; }
+html[data-accent="academia"] .card-start .donebtn.on{ background:#5C6E4F; border-color:#5C6E4F; color:#F2EAD8; }
+html[data-accent="academia"] .card-progress{ background:linear-gradient(180deg,#202B26,#1B241F); }
+html[data-accent="academia"] .card-progress .bar{ background:rgba(124,143,107,.28); }
+html[data-accent="academia"] .card-progress .mini-row b{ color:#EFE3C4; }
+
+/* Chapter + parchment sections */
+html[data-accent="academia"] .panel.gold-edge{ border-color:rgba(173,149,101,.55); background:linear-gradient(180deg,#212B26,#1B241F); }
+html[data-accent="academia"] .script-note{
+  position:absolute; top:14px; right:18px; font-family:var(--font-head); font-style:italic;
+  font-size:.88rem; color:#5A4F38; text-align:right; line-height:1.25; transform:rotate(-2deg);
+}
+html[data-accent="academia"] .script-note svg{ display:block; margin:2px 0 0 auto; width:74px; height:10px; }
+html[data-accent="academia"] .metric-row.three{ grid-template-columns:1fr; }
+html[data-accent="academia"] .panel.parchment .chip{ border-color:rgba(38,35,28,.2); background:rgba(38,35,28,.06); color:var(--p-muted); }
+html[data-accent="academia"] .panel.parchment .icon-btn{ color:var(--p-ink); }
+html[data-accent="academia"] .panel.parchment .icon-btn:hover{ background:rgba(38,35,28,.08); }
+html[data-accent="academia"] .panel.parchment .btn-ghost{ background:rgba(38,35,28,.08); color:#26231C; }
+html[data-accent="academia"] .panel.parchment .btn-text{ color:#7A5A33; }
+html[data-accent="academia"] .panel.parchment .btn-danger{ color:#8A4A56; border-color:rgba(138,74,86,.55); }
+html[data-accent="academia"] .panel.parchment .addcheck input{ border-color:rgba(38,35,28,.25); color:#26231C; }
+html[data-accent="academia"] .panel.parchment .checkrow{ border-bottom-color:rgba(38,35,28,.14); }
+html[data-accent="academia"] .panel.parchment .checkrow .box{ border-color:rgba(38,35,28,.3); }
+html[data-accent="academia"] .panel.parchment .donebtn{ border-color:rgba(38,35,28,.3); color:var(--p-muted); }
+html[data-accent="academia"] .panel.parchment .legend{ color:var(--p-muted); }
+html[data-accent="academia"] .panel.parchment .chip.days{ background:#E3C9C4; border-color:#E3C9C4; color:#6B3A44; }
+html[data-accent="academia"] .panel.parchment .chip.soon{ background:#E4D9BC; border-color:#E4D9BC; color:#6E5A2E; }
+html[data-accent="academia"] .panel.parchment .bar{ background:#CBD6C2; }
+html[data-accent="academia"] .panel.parchment .bar > i{ background:#C9A96A; }
+html[data-accent="academia"] .panel.parchment .bar.knob::before{ background:#C9A96A; border:2px solid #F1E8D5; }
+html[data-accent="academia"] .panel.parchment .prog-caption .big{ color:#26231C; }
+html[data-accent="academia"] .panel.parchment .prog-caption{ color:var(--p-muted); }
+
+/* Exam rows on parchment (Upcoming exams) */
+html[data-accent="academia"] .exam-tile{ width:42px; height:42px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#F2E4D5; flex:0 0 auto; }
+html[data-accent="academia"] .exam-tile svg{ width:19px; height:19px; }
+html[data-accent="academia"] .exrow{ border-bottom-color:rgba(38,35,28,.14); }
+html[data-accent="academia"] .exrow .nm small{ color:var(--p-muted); }
+html[data-accent="academia"] .exrow .cov{ color:var(--p-muted); }
+html[data-accent="academia"] .exrow .cov b{ color:#26231C; }
+html[data-accent="academia"] .panel.parchment .exrow.urgent{ box-shadow:inset 3px 0 0 #8A4A56; }
+html[data-accent="academia"] .leaf-deco{ position:absolute; right:6px; bottom:6px; width:74px; height:96px; color:#9C8B62; opacity:.5; pointer-events:none; display:block; }
+.leaf-deco{ display:none; }
+
+/* Session rows on parchment */
+html[data-accent="academia"] .panel.parchment .srow{ border-bottom-color:rgba(38,35,28,.14); }
+html[data-accent="academia"] .panel.parchment .srow .st small{ color:var(--p-muted); }
+html[data-accent="academia"] .panel.parchment .srow .st small .subj{ color:#7A5A33; }
+html[data-accent="academia"] .panel.parchment .srow .seq{ color:#A58B57; }
+
+/* Readiness rows on dark */
+html[data-accent="academia"] .panel.dark-open{ background:transparent; border:0; border-top:1px solid var(--line); border-radius:0; padding:14px 2px 0; }
+html[data-accent="academia"] .panel.dark-open .panel-h{ margin-bottom:4px; }
+
+/* Insights */
+html[data-accent="academia"] .insight-txt{ font-size:.95rem; line-height:1.65; color:#D8CBA6; }
+html[data-accent="academia"] .nextfocus{ margin-top:14px; padding-top:12px; border-top:1px solid var(--hairline); }
+html[data-accent="academia"] .nextfocus .nf-lbl{ display:flex; align-items:center; gap:8px; font-family:var(--font-head); font-weight:600; font-size:1.02rem; margin-bottom:4px; }
+html[data-accent="academia"] .nextfocus .nf-lbl svg{ width:17px; height:17px; color:var(--accent-strong); }
+html[data-accent="academia"] .nextfocus p{ font-size:.88rem; color:var(--muted); }
+
+/* Bottom nav leaves + underline */
+html[data-accent="academia"] .bottomnav{ background:linear-gradient(180deg,#0D1310,#0A0F0C); }
+html[data-accent="academia"] .nav-btn.on::after{
+  content:''; position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+  width:56%; height:2px; background:var(--accent-strong); border-radius:2px;
+}
+
+/* Legend */
+html[data-accent="academia"] .legend .lp i{ background:#C9A96A; }
+html[data-accent="academia"] .legend .lc i{ background:#6E8464; }
+
+/* ==========================================================================
+   4. THEME — CLEAN SCANDINAVIAN
+   Airy, flat, precise. No cards where possible: hairlines, huge light
+   numerals, 2px progress lines, 7/4 asymmetric desktop split, radius 3.
+   ========================================================================== */
+html[data-accent="scandinavian"]{
+  --font-head:'Helvetica Neue',Helvetica,'Segoe UI',Roboto,'PingFang SC','Noto Sans SC',Arial,sans-serif;
+  --r:3px; --r-btn:3px;
+  --chart-planned:#46697F; --chart-done:#5E7D6C;
+  --bg:#FBFBF9; --bg-glow:none;
+  --text:#2B3640; --muted:#6E7B87;
+  --panel:#EEF0F1; --panel-2:#F3F4F5;
+  --line:rgba(43,54,64,.13); --hairline:rgba(43,54,64,.16);
+  --accent:#46697F; --accent-strong:#3D5C70; --accent-ink:#FFFFFF;
+  --primary:#2B3640; --primary-strong:#3A4753; --primary-ink:#F5F7F8;
+  --p-bg:#E8EEF2; --p-ink:#2B3640; --p-muted:#6E7B87; --p-line:rgba(43,54,64,.12); --p-border:#E8EEF2;
+  --ok:#5E7D6C; --ok-ink:#4A675A; --warn:#B08A3E; --danger:#A94A52; --danger-bg:rgba(169,74,82,.1);
+  --nav-bg:rgba(251,251,249,.82); --nav-line:rgba(43,54,64,.12);
+  --chip-bg:rgba(43,54,64,.06);
+  --shadow-card:none; --shadow-pop:0 24px 60px rgba(43,54,64,.18);
+  --track:rgba(43,54,64,.12);
+  --modal-bg:#FFFFFF; --modal-ink:#2B3640;
+  --toast-bg:#2B3640; --toast-ink:#F5F7F8;
+  --btn-dark-bg:#2B3640; --btn-dark-ink:#F5F7F8; --btn-dark-line:#2B3640;
+}
+html[data-accent="scandinavian"][data-mode="dark"]{
+  --bg:#1A2027; --text:#E8ECEF; --muted:#93A1AC;
+  --chart-planned:#8FB3C7; --chart-done:#7FA98F;
+  --panel:#222B34; --panel-2:#1E262F;
+  --line:rgba(232,236,239,.13); --hairline:rgba(232,236,239,.16);
+  --accent:#8FB3C7; --accent-strong:#A5C4D6; --accent-ink:#16202A;
+  --primary:#E8ECEF; --primary-strong:#fff; --primary-ink:#1A2027;
+  --p-bg:#24303A; --p-ink:#E8ECEF; --p-muted:#93A1AC; --p-line:rgba(232,236,239,.12); --p-border:#24303A;
+  --ok:#7FA98F; --ok-ink:#9CC3AA; --danger:#C96E75; --danger-bg:rgba(201,110,117,.14);
+  --nav-bg:rgba(26,32,39,.8); --nav-line:rgba(232,236,239,.12);
+  --chip-bg:rgba(232,236,239,.07);
+  --track:rgba(232,236,239,.14);
+  --modal-bg:#222B34; --modal-ink:#E8ECEF;
+  --toast-bg:#E8ECEF; --toast-ink:#1A2027;
+  --btn-dark-bg:#243039; --btn-dark-ink:#E8ECEF; --btn-dark-line:#31404C;
+}
+html[data-accent="scandinavian"] body{ letter-spacing:-.006em; }
+html[data-accent="scandinavian"] .brand-name b{ font-weight:700; letter-spacing:-.02em; font-family:var(--font-body); font-size:1.05rem; }
+html[data-accent="scandinavian"] .brand-name span{ letter-spacing:.3em; }
+html[data-accent="scandinavian"] .brand .logo circle,html[data-accent="scandinavian"] .brand .logo path{ stroke:var(--accent); }
+html[data-accent="scandinavian"] .topbar{ background:var(--topbar-bg,transparent); border-bottom:1px solid var(--line); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+html[data-accent="scandinavian"] .streak-chip{ border-color:var(--line); color:var(--text); }
+html[data-accent="scandinavian"] .streak-chip b{ font-family:var(--font-body); font-weight:700; font-size:.9rem; }
+html[data-accent="scandinavian"] .eyebrow{ color:var(--accent); letter-spacing:.2em; }
+html[data-accent="scandinavian"] .eyebrow::after{ width:22px; background:var(--accent); }
+html[data-accent="scandinavian"] .headline{
+  font-family:var(--font-body); font-weight:600; letter-spacing:-.04em; line-height:1.02;
+  font-size:clamp(2.1rem,7.6vw,3.4rem); max-width:17ch; color:var(--text);
+}
+html[data-accent="scandinavian"] .mast-sub{ font-size:.98rem; }
+html[data-accent="scandinavian"] .mast-illus{ -webkit-mask-image:none; mask-image:none; opacity:.5; top:26px; width:33%; }
+html[data-accent="scandinavian"] .chapter h2{ font-family:var(--font-body); font-weight:600; font-size:1.05rem; letter-spacing:-.01em; }
+html[data-accent="scandinavian"] .panel{ border:0; background:transparent; padding:0; }
+html[data-accent="scandinavian"] .panel.soft{ background:var(--panel); border-radius:var(--r); padding:18px; }
+html[data-accent="scandinavian"] .panel.ice,.scandi .panel.ice{ background:var(--p-bg); border-radius:var(--r); padding:22px; }
+html[data-accent="scandinavian"] .panel-h .pic{ display:none; }
+html[data-accent="scandinavian"] .panel-h h3{ font-family:var(--font-body); font-weight:600; font-size:1.05rem; }
+/* Flat start-here block: no border, no shadow */
+html[data-accent="scandinavian"] .card-start{ background:var(--p-bg); border:0; border-radius:var(--r); box-shadow:none; }
+html[data-accent="scandinavian"] .card-start .card-kicker{ color:var(--muted); letter-spacing:.18em; font-size:.64rem; }
+html[data-accent="scandinavian"] .card-start .card-kicker::after{ display:none; }
+html[data-accent="scandinavian"] .sess-title{ font-family:var(--font-body); font-weight:600; letter-spacing:-.02em; font-size:1.5rem; }
+html[data-accent="scandinavian"] .quote{ font-family:var(--font-body); font-style:normal; border-left:0; padding:10px 0 0; color:var(--muted); border-top:1px solid var(--p-line); font-size:.86rem; }
+html[data-accent="scandinavian"] .btn-outline{ border-color:var(--hairline); color:var(--text); }
+/* Progress: NOT a card — huge light numeral + 2px line + aligned metrics */
+html[data-accent="scandinavian"] .card-progress{
+  background:transparent; border:0; width:100%; margin:6px 0 0; border-radius:0; padding:18px 0 0;
+}
+html[data-accent="scandinavian"] .huge-num{
+  font-weight:200; font-size:4.8rem; line-height:.95; letter-spacing:-.03em; color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+html[data-accent="scandinavian"] .huge-num small{ font-size:1.15rem; font-weight:400; color:var(--muted); letter-spacing:0; }
+html[data-accent="scandinavian"] .pline{ height:2px; background:var(--track); border-radius:0; margin:14px 0 4px; overflow:visible; position:relative; }
+html[data-accent="scandinavian"] .pline > i{ display:block; height:2px; background:var(--accent); border-radius:0; }
+html[data-accent="scandinavian"] .bar{ border-radius:0; height:2px; }
+html[data-accent="scandinavian"] .bar > i{ border-radius:0; }
+html[data-accent="scandinavian"] .bar.knob::before{ display:none; }
+html[data-accent="scandinavian"] .mini-row{ border-bottom:1px solid var(--line); padding:9px 0; }
+html[data-accent="scandinavian"] .mini-row b{ font-weight:600; }
+/* compact borderless session rows, no sequence numbers */
+html[data-accent="scandinavian"] .srow{ grid-template-columns:1fr auto; padding:10px 0; border-bottom:1px solid var(--line); min-height:48px; }
+html[data-accent="scandinavian"] .srow .seq{ display:none; }
+html[data-accent="scandinavian"] .srow .st b{ font-weight:600; }
+html[data-accent="scandinavian"] .srow.urgent{ box-shadow:inset 2px 0 0 var(--danger); padding-left:10px; }
+html[data-accent="scandinavian"] .donebtn{ border-radius:3px; width:38px; height:38px; }
+html[data-accent="scandinavian"] .exrow{ border-bottom:1px solid var(--line); padding:11px 0; min-height:52px; }
+html[data-accent="scandinavian"] .exrow.urgent{ box-shadow:inset 2px 0 0 var(--danger); padding-left:10px; }
+html[data-accent="scandinavian"] .segs i{ border-radius:1px; }
+html[data-accent="scandinavian"] .segs i.on{ background:var(--accent); }
+html[data-accent="scandinavian"] .chip{ border-radius:2px; border-color:var(--line); }
+html[data-accent="scandinavian"] .bottomnav{ -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border-top:1px solid var(--line); }
+html[data-accent="scandinavian"] .nav-btn{ font-size:.64rem; }
+html[data-accent="scandinavian"] .nav-btn.on{ color:var(--text); }
+html[data-accent="scandinavian"] .nav-btn.on::before{
+  content:''; position:absolute; top:0; left:22%; right:22%; height:2px; background:var(--primary);
+}
+html[data-accent="scandinavian"][data-mode="dark"] .nav-btn.on::before{ background:var(--accent-strong); }
+html[data-accent="scandinavian"] .navleaf{ display:none; }
+html[data-accent="scandinavian"] .metric .val{ font-family:var(--font-body); font-weight:200; font-size:2.3rem; letter-spacing:-.03em; }
+html[data-accent="scandinavian"] .metric .val small{ font-family:var(--font-body); }
+html[data-accent="scandinavian"] .bigstat{ font-family:var(--font-body); font-weight:200; font-size:3rem; letter-spacing:-.03em; }
+html[data-accent="scandinavian"] .bigstat small{ font-family:var(--font-body); }
+html[data-accent="scandinavian"] .legend i{ border-radius:1px; }
+
+/* ==========================================================================
+   5. THEME — COZY STUDY SEASON
+   Cream paper, layered overlapping cards, serif display, terracotta,
+   botanical line art, ruled notebook session list.
+   ========================================================================== */
+html[data-accent="cozy"]{
+  --font-head:Charter,'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
+  --r:14px; --r-btn:9px;
+  --chart-planned:#C9A66B; --chart-done:#7C8F6B;
+  --bg:#FBF6EC; --bg-glow:none;
+  --text:#3A2A1E; --muted:#8A7A66;
+  --panel:#FFFDF8; --panel-2:#F7F0E2;
+  --line:rgba(107,79,58,.15); --hairline:rgba(107,79,58,.18);
+  --accent:#B4603A; --accent-strong:#B4603A; --accent-ink:#FFFDF8;
+  --primary:#B4603A; --primary-strong:#C46C42; --primary-ink:#FFF9EF;
+  --p-bg:#FFFDF8; --p-ink:#3A2A1E; --p-muted:#8A7A66; --p-line:rgba(107,79,58,.14); --p-border:rgba(107,79,58,.12);
+  --ok:#7C8F6B; --ok-ink:#66794F; --warn:#C9A66B; --danger:#A84E42; --danger-bg:rgba(168,78,66,.1);
+  --nav-bg:#FFFDF8; --nav-line:rgba(107,79,58,.14);
+  --chip-bg:rgba(107,79,58,.07);
+  --shadow-card:0 10px 28px rgba(107,79,58,.1),0 2px 6px rgba(107,79,58,.06);
+  --shadow-pop:0 24px 60px rgba(58,42,30,.22);
+  --track:rgba(107,79,58,.14);
+  --modal-bg:#FFFDF8; --modal-ink:#3A2A1E;
+  --toast-bg:#3A2A1E; --toast-ink:#FBF6EC;
+  --btn-dark-bg:#6B4F3A; --btn-dark-ink:#FFF9EF; --btn-dark-line:#6B4F3A;
+}
+html[data-accent="cozy"][data-mode="dark"]{
+  --bg:#211A15; --text:#EFE6D6; --muted:#A8977F;
+  --chart-planned:#D9BC85; --chart-done:#8FA37E;
+  --panel:#2B221B; --panel-2:#251E17;
+  --line:rgba(239,230,214,.14); --hairline:rgba(239,230,214,.18);
+  --p-bg:#2B221B; --p-ink:#EFE6D6; --p-muted:#A8977F; --p-line:rgba(239,230,214,.13); --p-border:rgba(239,230,214,.1);
+  --nav-bg:#251E17; --nav-line:rgba(239,230,214,.12);
+  --chip-bg:rgba(239,230,214,.07);
+  --track:rgba(239,230,214,.15);
+  --shadow-card:0 10px 28px rgba(0,0,0,.3),0 2px 6px rgba(0,0,0,.25);
+  --modal-bg:#2B221B; --modal-ink:#EFE6D6;
+}
+html[data-accent="cozy"] body{ font-size:15.5px; }
+html[data-accent="cozy"] .brand-name b{ color:#B4603A; }
+html[data-accent="cozy"] .brand .logo circle,html[data-accent="cozy"] .brand .logo path{ stroke:#B4603A; }
+html[data-accent="cozy"] .streak-chip{ border-color:rgba(180,96,58,.4); color:#B4603A; background:rgba(180,96,58,.07); }
+html[data-accent="cozy"] .eyebrow,.cozy-tag{
+  font-family:var(--font-head); font-style:italic; text-transform:none; letter-spacing:.02em;
+  font-size:1rem; color:#66794F; font-weight:400;
+}
+html[data-accent="cozy"] .eyebrow::after{ width:26px; background:rgba(124,143,107,.6); }
+html[data-accent="cozy"] .headline{
+  font-weight:500; letter-spacing:-.015em; line-height:1.04; color:#3A2A1E;
+  font-size:clamp(2.2rem,8.2vw,3.6rem); max-width:14ch;
+}
+html[data-accent="cozy"] .headline .tdot{ color:#B4603A; }
+html[data-accent="cozy"][data-mode="dark"] .headline{ color:#EFE6D6; }
+html[data-accent="cozy"] .mast-illus{ -webkit-mask-image:none; mask-image:none; }
+html[data-accent="cozy"] .mast-illus svg{ color:#5F7350; opacity:.75; }
+@media (min-width:720px){
+  html[data-accent="cozy"] .mast-illus{ width:200px; right:auto; left:min(66%,380px); top:64px; }
+}
+html[data-accent="cozy"] .chapter h2{ font-size:1.45rem; }
+html[data-accent="cozy"] .chapter .rule{ background:rgba(201,166,107,.5); }
+html[data-accent="cozy"] .panel{ background:var(--panel); border:1px solid rgba(107,79,58,.1); box-shadow:var(--shadow-card); }
+html[data-accent="cozy"] .card{ box-shadow:var(--shadow-card); }
+html[data-accent="cozy"] .card-start{ background:var(--panel); border:1px solid rgba(107,79,58,.1); }
+html[data-accent="cozy"] .card-progress{ background:var(--panel); border:1px solid rgba(107,79,58,.1); }
+html[data-accent="cozy"] .tagchip{ background:#F1E7D2; color:#A5713F; border-radius:6px; padding:3px 9px; font-size:.6rem; }
+html[data-accent="cozy"][data-mode="dark"] .tagchip{ background:rgba(201,166,107,.16); color:#D9BC85; }
+html[data-accent="cozy"] .card-progress .card-kicker{ color:#66794F; }
+html[data-accent="cozy"] .card-progress .card-kicker::after{ background:rgba(124,143,107,.4); }
+html[data-accent="cozy"] .bar{ background:rgba(201,166,107,.3); }
+html[data-accent="cozy"] .bar > i{ background:#B4603A; }
+html[data-accent="cozy"] .bar.knob::before{ display:none; }
+html[data-accent="cozy"] .srow .seq{ color:#C9A66B; }
+/* Ruled notebook page */
+html[data-accent="cozy"] .ruled{
+  position:relative; border-radius:10px; background:var(--panel);
+  border:1px solid rgba(107,79,58,.1); box-shadow:var(--shadow-card);
+  padding:6px 16px 6px 0; overflow:hidden;
+}
+html[data-accent="cozy"] .ruled::before{
+  content:''; position:absolute; left:2.6rem; top:0; bottom:0; width:1.5px;
+  background:rgba(180,96,58,.4);
+}
+html[data-accent="cozy"] .ruled::after{
+  content:''; position:absolute; left:0; right:0; top:0; bottom:0; pointer-events:none;
+  background:repeating-linear-gradient(to bottom,transparent 0 calc(3.3rem - 1px),rgba(201,166,107,.4) calc(3.3rem - 1px) 3.3rem);
+  background-position:0 6px;
+}
+html[data-accent="cozy"] .ruled .srow{
+  min-height:3.3rem; height:3.3rem; padding:0 2px 0 3.4rem; border-bottom:0;
+  align-items:flex-end;
+}
+html[data-accent="cozy"] .ruled .srow .st{ display:flex; align-items:baseline; gap:8px; min-width:0; overflow:hidden; padding-bottom:10px; }
+html[data-accent="cozy"] .ruled .srow .st b{ display:inline; padding:0; font-size:.95rem; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:52%; }
+html[data-accent="cozy"] .ruled .srow .st small{ display:inline; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 1 auto; min-width:0; }
+html[data-accent="cozy"] .ruled .srow .donebtn{ width:38px; height:38px; margin-bottom:4px; }
+html[data-accent="cozy"] .donebtn{ border-color:rgba(107,79,58,.3); color:#8A7A66; }
+html[data-accent="cozy"] .donebtn.on{ background:#7C8F6B; border-color:#7C8F6B; color:#FFFDF8; }
+html[data-accent="cozy"] .exrow{ border-bottom:1px solid rgba(107,79,58,.12); }
+html[data-accent="cozy"] .exam-tile{ width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; color:#FFF9EF; flex:0 0 auto; }
+html[data-accent="cozy"] .exam-tile svg{ width:19px; height:19px; }
+html[data-accent="cozy"] .exrow .nm small{ color:var(--p-muted); }
+html[data-accent="cozy"] .exrow .cov{ color:var(--p-muted); }
+html[data-accent="cozy"] .exrow .cov b{ color:var(--text); }
+html[data-accent="cozy"] .chip.days{ background:#F3E0D8; border-color:#F3E0D8; color:#A84E42; }
+html[data-accent="cozy"] .chip.soon{ background:#EFE6CF; border-color:#EFE6CF; color:#8A6F35; }
+html[data-accent="cozy"] .closing-line{
+  text-align:center; font-family:var(--font-head); font-style:italic; font-size:1.08rem;
+  color:#6B4F3A; margin:30px auto 6px; max-width:30ch; line-height:1.5;
+}
+html[data-accent="cozy"] .closing-line .hl{ color:#B4603A; }
+html[data-accent="cozy"][data-mode="dark"] .closing-line{ color:#C9B896; }
+html[data-accent="cozy"] .flourish{ display:block; margin:2px auto 0; width:88px; height:16px; color:#C9A66B; opacity:.8; }
+html[data-accent="cozy"] .botanical{ position:absolute; pointer-events:none; color:#7C8F6B; }
+html[data-accent="cozy"] .cards-scene{ position:relative; }
+html[data-accent="cozy"] .cards-scene .tree{ position:absolute; right:-30px; top:-34px; width:min(78%,320px); color:#6B4F3A; opacity:.22; pointer-events:none; z-index:0; }
+html[data-accent="cozy"] .cards-scene .card{ z-index:1; }
+html[data-accent="cozy"] .statpair{ display:flex; gap:22px; margin-top:14px; }
+html[data-accent="cozy"] .statpair .sp b{ font-family:var(--font-head); font-size:1.3rem; font-weight:600; display:block; line-height:1.1; }
+html[data-accent="cozy"] .statpair .sp small{ font-size:.56rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+html[data-accent="cozy"] .round-arrow{
+  width:40px; height:40px; border-radius:50%; background:#B4603A; color:#FFF9EF;
+  display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+}
+html[data-accent="cozy"] .round-arrow svg{ width:17px; height:17px; }
+html[data-accent="cozy"] .feature-row{ display:flex; align-items:center; gap:10px; font-size:.88rem; color:var(--muted); padding:7px 0; }
+html[data-accent="cozy"] .feature-row svg{ width:17px; height:17px; color:#B4603A; opacity:.85; flex:0 0 auto; }
+html[data-accent="cozy"] .feature-row b{ color:var(--text); font-weight:600; }
+html[data-accent="cozy"] .bottomnav{ border-top:1px solid rgba(107,79,58,.16); }
+html[data-accent="cozy"] .nav-btn.on{ color:#B4603A; }
+html[data-accent="cozy"] .nav-btn.on::after{
+  content:''; position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
+  width:44%; height:3px; border-radius:3px; background:#B4603A;
+}
+html[data-accent="cozy"] .navleaf{ display:none; }
+html[data-accent="cozy"] .mini-row b{ color:var(--text); }
+html[data-accent="cozy"] .metric .val{ color:var(--text); }
+html[data-accent="cozy"] .metric svg{ color:#B4603A; }
+
+/* ==========================================================================
+   6. RESPONSIVE — phone first (360–430), tablet 720, desktop 1000
+   ========================================================================== */
+
+/* --- Tablet & up: hero overlap grows; start-here + progress split --- */
+@media (min-width:720px){
+  .wrap{ padding:0 30px 120px; }
+  .topbar-in{ padding:12px 30px; }
+  .panel{ padding:24px; }
+  .card{ padding:26px; }
+
+  /* Academia + base: Start here full-width-ish; progress card sits ~40% across,
+     dropped ~9rem into the start card's lower-right (in-flow, no clipping). */
+  html[data-accent="academia"] .hero-cards .card-progress{
+    width:min(56%,460px); margin:-9rem 1.5% 0 auto;
+  }
+  html[data-accent="academia"] .card-start{ margin-right:8%; }
+
+  /* Cozy: keep the 3-card ladder overlapping, larger offsets */
+  html[data-accent="cozy"] .hero-cards .card-progress{ width:78%; margin:-2.4rem 0 0 auto; }
+  html[data-accent="cozy"] .hero-cards .card-upnext{ width:64%; margin:-2.2rem auto 0 12%; }
+
+  /* Plan screen: chart + insights side by side (like reference) */
+  .plan-grid{ display:grid; grid-template-columns:1.55fr 1fr; gap:20px; align-items:stretch; }
+  .plan-grid .panel{ margin:0; }
+  html[data-accent] .metric-row.three{ grid-template-columns:repeat(3,1fr); }
+  html[data-accent] .metric-row.three .metric{ display:grid; grid-template-columns:22px 1fr; grid-template-rows:auto auto; column-gap:12px; align-items:center; padding:14px 20px; }
+  html[data-accent] .metric-row.three .metric svg{ grid-row:1 / span 2; grid-column:1; }
+  html[data-accent] .metric-row.three .metric .lbl{ grid-column:2; grid-row:1; }
+  html[data-accent] .metric-row.three .metric .val{ grid-column:2; grid-row:2; font-size:1.9rem; margin-top:2px; }
+  html[data-accent] .metric-row.three .metric + .metric{ border-top:0; border-left:1px solid var(--p-line); }
+  html[data-accent="scandinavian"] .metric-row.three .metric .val{ font-size:2.2rem; font-weight:200; letter-spacing:-.03em; }
+
+  /* Scandinavia: asymmetric 7/4 split, no overlap */
+  html[data-accent="scandinavian"] .scandi-split{
+    display:grid; grid-template-columns:7fr 4fr; gap:40px; align-items:start;
+  }
+  html[data-accent="scandinavian"] .scandi-split .col-b{ padding-top:76px; }
+  html[data-accent="scandinavian"] .card-start{ margin-right:0; }
+
+  /* Cozy desktop mirrors the reference: heading column left, card stack right */
+  html[data-accent="cozy"] .cozy-split{
+    display:grid; grid-template-columns:0.9fr 1.1fr; gap:44px; align-items:start; margin-top:10px;
+  }
+  html[data-accent="cozy"] .cozy-split .col-a{ position:sticky; top:96px; }
+  html[data-accent="cozy"] .cozy-split .col-b .hero-cards{ margin-top:0; }
+  html[data-accent="cozy"] .cozy-split .col-b .card-upnext{ width:70%; margin:-2.2rem auto 0 16%; }
+
+  /* Progress screen splits */
+  .prog-split{ display:grid; grid-template-columns:1.6fr 1fr; gap:20px; align-items:stretch; }
+  .prog-split .panel{ margin:0; }
+}
+
+@media (min-width:1000px){
+  .headline{ font-size:2.8rem; }
+  html[data-accent="cozy"] .headline{ font-size:3.3rem; }
+  html[data-accent="scandinavian"] .headline{ font-size:3.6rem; }
+  .mast-illus{ width:min(38%,400px); right:0; }
+}
+
+/* Small phones: keep overlapped hero readable */
+@media (max-width:379px){
+  .card-progress{ width:94%; }
+  html[data-accent="cozy"] .hero-cards .card-upnext{ width:88%; margin-left:8%; }
+}
+
+/* ==========================================================================
+   7. PRINT (Plan screen as clean document) + reduced motion
+   ========================================================================== */
+@media print{
+  html[data-accent]{ --bg:#FFFFFF; --bg-glow:none; --text:#161616; --muted:#5A5A5A;
+    --panel:#FFFFFF; --line:#D8D8D8; --hairline:#D8D8D8; --accent:#7A6233; --accent-strong:#7A6233;
+    --nav-bg:#FFFFFF; --chip-bg:#F2F2F2; --track:#E3E3E3; }
+  html[data-accent] body{ background:#fff !important; }
+  .topbar,.bottomnav,.mast-actions,.mast-illus,.no-print,.toast-wrap,.modal-overlay,.navleaf,.leaf-deco{ display:none !important; }
+  .screen{ display:none !important; }
+  #screen-plan{ display:block !important; }
+  .wrap{ padding:0 !important; max-width:none; }
+  .panel{ break-inside:avoid; border:1px solid #DDD; box-shadow:none !important; }
+  .headline{ color:#111; }
+  html[data-accent="academia"] .panel.parchment{ background:#fff; border-color:#CCC; color:#161616; }
+  html[data-accent="academia"] .panel.parchment *{ color:#161616 !important; }
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="demo-bar no-print">Demo version &middot; sample data, saved only in this browser &middot; <button data-action="load-demo">Restart demo</button></div>
+  <header class="topbar no-print"><div class="topbar-in" id="topbarIn"></div></header>
+  <main class="wrap" id="main">
+    <section class="screen" id="screen-today" aria-label="Today"></section>
+    <section class="screen" id="screen-plan" aria-label="Plan"></section>
+    <section class="screen" id="screen-progress" aria-label="Progress"></section>
+    <section class="screen" id="screen-exams" aria-label="Exams"></section>
+    <section class="screen" id="screen-settings" aria-label="Settings"></section>
+  </main>
+  <nav class="bottomnav no-print" aria-label="Screens"><div class="nav-in" id="navIn"></div></nav>
+</div>
+<div class="modal-overlay" id="overlay" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+</div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============================== UTILS ============================== */
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const pIso=s=>{const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);};
+const addD=(s,n)=>{const d=pIso(s);d.setDate(d.getDate()+n);return iso(d);};
+const diffD=(a,b)=>Math.round((pIso(a)-pIso(b))/864e5);
+const tISO=()=>iso(new Date());
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const fmtD=(s,withY)=>{const d=pIso(s);const y=withY||d.getFullYear()!==new Date().getFullYear();return d.getDate()+' '+MON3[d.getMonth()]+(y?' '+d.getFullYear():'');};
+const fmtH=h=>{const v=Math.round(h*10)/10;return (v%1===0?v.toFixed(0):String(v))+'h';};
+const pct=v=>Math.round(v*100)+'%';
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const pl=(n,w)=>n+' '+w+(n===1?'':'s'); // FIX #13: plurals
+function greeting(){const h=new Date().getHours();return h<5?'up late':h<12?'morning':h<18?'afternoon':'evening';}
+
+/* ============================== ICONS ============================== */
+const ICONS={
+  flame:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  refresh:'<path d="M20.49 15a9 9 0 1 1-2.1-9.36L21 8.6"/><path d="M21 3.6v5h-5"/>',
+  dots:'<circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none"/>',
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
+  printer:'<path d="M6.5 8.5v-5h11v5"/><rect x="3.5" y="8.5" width="17" height="8" rx="1.5"/><path d="M6.5 14h11v6.5h-11z"/>',
+  home:'<path d="M4 11l8-7.5L20 11"/><path d="M5.5 9.8V20h4.7v-5.4h3.6V20h4.7V9.8"/>',
+  pulse:'<path d="M3 12h4.2l2.3-5.6 4 11.2 2.3-5.6H21"/>',
+  book:'<path d="M2.5 5c2.8-1.4 5.7-1.4 8.5 0v14.2c-2.8-1.4-5.7-1.4-8.5 0z"/><path d="M21.5 5c-2.8-1.4-5.7-1.4-8.5 0v14.2c2.8-1.4 5.7-1.4 8.5 0z"/>',
+  gear:'<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M18.5 5.5l-1.9 1.9M7.4 16.6l-1.9 1.9"/>',
+  check:'<path d="M4.5 12.6l4.8 4.9L19.5 6.8"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.3"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>',
+  bulb:'<path d="M9.5 17.5h5M10.2 20.5h3.6"/><path d="M12 3.2a6.3 6.3 0 0 1 3.7 11.4c-.7.55-1.2 1.3-1.2 2.1h-5c0-.8-.5-1.55-1.2-2.1A6.3 6.3 0 0 1 12 3.2z"/>',
+  bars:'<path d="M5 20v-6M10 20V9M15 20v-4M20 20V5"/>',
+  clock:'<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.2 1.9"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13"/>',
+  minus:'<path d="M6 12h12"/>',
+  x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  arrowr:'<path d="M4.5 12h14M13.5 6.5l5.5 5.5-5.5 5.5"/>',
+  chevr:'<path d="M9.5 5.5l6.5 6.5-6.5 6.5"/>',
+  trash:'<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7M10.2 10.5v6M13.8 10.5v6"/>',
+  edit:'<path d="M4.5 19.5h4L19.6 8.4a2.05 2.05 0 0 0-2.9-2.9L5.6 16.6z"/><path d="M13.8 6.7l3.5 3.5"/>',
+  sun:'<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
+  moon:'<path d="M20 13.6A8.2 8.2 0 1 1 10.4 4a6.6 6.6 0 0 0 9.6 9.6z"/>',
+  timer:'<circle cx="12" cy="13.5" r="7.8"/><path d="M12 9.8v3.9l2.6 1.5M9.5 2.5h5"/>',
+  note:'<path d="M6.5 3.5h8l4 4v13h-12z"/><path d="M14 3.5V8h4.2M9.5 12.5h5M9.5 16h5"/>',
+  download:'<path d="M12 4v10.5M7.5 11l4.5 4.5 4.5-4.5M5 19.5h14"/>',
+  star:'<path d="M12 4l2.35 4.9 5.4.7-3.95 3.75.95 5.35L12 16.1l-4.75 2.6.95-5.35L4.25 9.6l5.4-.7z"/>',
+  leaf:'<path d="M5 19C5 11 10.5 5.5 19 5c-.5 8.5-6 14-14 14z"/><path d="M5 19c3-5.5 7-9.5 11.5-11.5"/>',
+  list:'<path d="M8.5 6.5h12M8.5 12h12M8.5 17.5h12"/><circle cx="4.5" cy="6.5" r=".9" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r=".9" fill="currentColor" stroke="none"/>',
+  sparkle:'<path d="M12 3.5c.7 4.6 2.4 6.3 7 7-4.6.7-6.3 2.4-7 7-.7-4.6-2.4-6.3-7-7 4.6-.7 6.3-2.4 7-7z"/>'
+};
+function icon(n,sz){sz=sz||20;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||'')+'</svg>';}
+
+function brandLogo(){
+  const a=document.documentElement.dataset.accent;
+  if(a==='scandinavian'){
+    return '<svg class="logo" viewBox="0 0 24 24" fill="none" stroke="#46697F" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5 12h14"/><circle cx="12" cy="12" r="1.7" fill="#46697F" stroke="none"/></svg>';
+  }
+  if(a==='cozy'){
+    return '<svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5.6c-2.3-1.2-4.6-1.2-7 0v12.2c2.4-1.2 4.7-1.2 7 0 2.4-1.2 4.7-1.2 7 0V5.6c-2.4-1.2-4.7-1.2-7 0z" fill="#B4603A"/><path d="M12 5.6v12.2" stroke="#FFF9EF" stroke-width="1.3"/></svg>';
+  }
+  return '<svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    +'<circle cx="12" cy="12" r="10.6" stroke="#AD9565" stroke-width="1.2"/>'
+    +'<circle cx="12" cy="12" r="8.2" stroke="#AD9565" stroke-width=".6" opacity=".7"/>'
+    +'<path d="M12 4.8L13.5 10.5 19.2 12 13.5 13.5 12 19.2 10.5 13.5 4.8 12 10.5 10.5z" fill="#C9A96A"/>'
+    +'<circle cx="12" cy="12" r="1.1" fill="#141A17" stroke="#C9A96A" stroke-width=".8"/></svg>';
+}
+
+/* ==================== ILLUSTRATIONS (inline SVG) ==================== */
+/* Dark academia hero: books, potted plant, candle lamp, warm glow. */
+const ILLUS_ACADEMIA=(
+  '<svg viewBox="0 0 380 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+  +'<defs>'
+  +'<radialGradient id="agGlow" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#3E5244" stop-opacity=".85"/><stop offset="60%" stop-color="#2A3A2F" stop-opacity=".4"/><stop offset="100%" stop-color="#2A3A2F" stop-opacity="0"/></radialGradient>'
+  +'<linearGradient id="agLeaf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#24382C"/><stop offset="1" stop-color="#3E5C46"/></linearGradient>'
+  +'</defs>'
+  +'<ellipse cx="215" cy="150" rx="180" ry="130" fill="url(#agGlow)"/>'
+  /* lamp */
+  +'<circle cx="322" cy="130" r="30" fill="#E8C87A" opacity=".13"/>'
+  +'<path d="M322 116c5.5 8.5 5.5 15.5 0 19.5-5.5-4-5.5-11 0-19.5z" fill="#E8C87A"/>'
+  +'<path d="M315 140h14l-2.5 7h-9z" fill="#AD9565"/>'
+  +'<rect x="319" y="147" width="6" height="62" rx="2" fill="#AD9565"/>'
+  +'<path d="M306 209h32l-4 9h-24z" fill="#8A7448"/>'
+  +'<ellipse cx="322" cy="221" rx="19" ry="4.5" fill="#6E5B38"/>'
+  /* plant */
+  +'<path d="M97 200C94 156 76 132 52 116c30 6 48 34 50 84z" fill="url(#agLeaf)" stroke="#7C8F6B" stroke-width="1" stroke-opacity=".5"/>'
+  +'<path d="M99 200c2-44 14-72 40-90-20 26-32 54-34 90z" fill="url(#agLeaf)" stroke="#7C8F6B" stroke-width="1" stroke-opacity=".5"/>'
+  +'<path d="M95 200c-6-34-16-50-34-60 22 4 34 24 38 60z" fill="#2C4534" stroke="#7C8F6B" stroke-width="1" stroke-opacity=".45"/>'
+  +'<path d="M101 200c6-30 16-44 32-52-14 14-24 30-26 52z" fill="#2C4534" stroke="#7C8F6B" stroke-width="1" stroke-opacity=".45"/>'
+  +'<path d="M97 200c-1-26 2-44 8-58-8 18-12 36-13 58z" fill="#374F3B"/>'
+  +'<path d="M70 200h56l-7 42h-42z" fill="#4A3A2C"/><rect x="66" y="194" width="64" height="10" rx="3" fill="#5A4636"/>'
+  /* book pile A (stacked flat) */
+  +'<rect x="148" y="228" width="112" height="19" rx="3.5" fill="#542B3A"/>'
+  +'<rect x="252" y="231.5" width="6" height="12" rx="1" fill="#E8DCC0"/>'
+  +'<path d="M158 233.5h24M158 241h18" stroke="#AD9565" stroke-width="1.4" opacity=".8"/>'
+  +'<rect x="156" y="211" width="98" height="17" rx="3.5" fill="#2E4638"/>'
+  +'<rect x="246" y="214" width="6" height="11" rx="1" fill="#E8DCC0"/>'
+  +'<path d="M166 219.5h20" stroke="#AD9565" stroke-width="1.3" opacity=".7"/>'
+  +'<rect x="152" y="194" width="106" height="17" rx="3.5" fill="#E8DCC0"/>'
+  +'<path d="M162 202.5h26M162 206.5h18" stroke="#8A7448" stroke-width="1.2" opacity=".8"/>'
+  +'<g transform="rotate(-4 200 186)"><rect x="156" y="178" width="90" height="16" rx="3.5" fill="#31513F"/><path d="M166 186h22" stroke="#AD9565" stroke-width="1.2" opacity=".75"/><rect x="238" y="181" width="5" height="10" rx="1" fill="#E8DCC0"/></g>'
+  /* book pile B (upright row) */
+  +'<rect x="258" y="152" width="17" height="76" rx="2.5" fill="#542B3A"/><path d="M262 162h9M262 168h6" stroke="#AD9565" stroke-width="1" opacity=".7"/>'
+  +'<rect x="277" y="144" width="16" height="84" rx="2.5" fill="#E8DCC0"/><path d="M281 154h8M281 160h5" stroke="#8A7448" stroke-width="1" opacity=".8"/>'
+  +'<rect x="295" y="150" width="18" height="78" rx="2.5" fill="#2E4638"/><path d="M300 160h8M300 166h5" stroke="#AD9565" stroke-width="1" opacity=".7"/>'
+  +'<g transform="rotate(10 330 200)"><rect x="318" y="152" width="15" height="76" rx="2.5" fill="#6E3A4C"/><path d="M322 162h7" stroke="#AD9565" stroke-width="1" opacity=".7"/></g>'
+  +'<rect x="252" y="228" width="96" height="19" rx="3.5" fill="#24413A"/><path d="M262 237.5h22" stroke="#AD9565" stroke-width="1.2" opacity=".6"/><rect x="340" y="231.5" width="6" height="12" rx="1" fill="#E8DCC0"/>'
+  /* sparks */
+  +'<circle cx="52" cy="84" r="1.6" fill="#C9A96A" opacity=".55"/><circle cx="76" cy="60" r="1.2" fill="#C9A96A" opacity=".4"/>'
+  +'<circle cx="286" cy="96" r="1.4" fill="#E8C87A" opacity=".5"/><circle cx="248" cy="118" r="1.2" fill="#C9A96A" opacity=".4"/>'
+  +'<circle cx="30" cy="150" r="1.3" fill="#C9A96A" opacity=".35"/>'
+  +'</svg>');
+
+/* Cozy: fine tree line-art (behind cards) */
+const ILLUS_TREE=(
+  '<svg class="tree" viewBox="0 0 320 310" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">'
+  +'<circle cx="170" cy="150" r="118" stroke-dasharray="1 8" stroke-width="1.1"/>'
+  +'<path d="M164 306c-2-36-3-66-4-96"/>'
+  +'<path d="M160 210c-2-30-20-48-50-58"/>'
+  +'<path d="M110 152c-20-6-30-18-34-34"/><path d="M110 152c-6-16-2-28 8-40"/>'
+  +'<path d="M160 210c2-28 20-46 50-56"/>'
+  +'<path d="M210 154c20-6 30-18 34-34"/><path d="M210 154c6-16 2-28-8-40"/>'
+  +'<path d="M160 210c-1-20 1-36-6-50"/>'
+  +'<path d="M154 160c-8-8-18-12-30-12"/><path d="M154 160c8-10 18-14 32-14"/>'
+  +'<path d="M160 176c6-10 14-16 26-18"/><path d="M160 176c-6-10-14-16-26-18"/>'
+  +'<circle cx="76" cy="118" r="2.2" fill="currentColor" stroke="none"/><circle cx="118" cy="112" r="2" fill="currentColor" stroke="none"/>'
+  +'<circle cx="244" cy="120" r="2.2" fill="currentColor" stroke="none"/><circle cx="202" cy="114" r="2" fill="currentColor" stroke="none"/>'
+  +'<circle cx="124" cy="148" r="1.8" fill="currentColor" stroke="none"/><circle cx="186" cy="146" r="1.8" fill="currentColor" stroke="none"/>'
+  +'<circle cx="154" cy="142" r="1.8" fill="currentColor" stroke="none"/><circle cx="134" cy="160" r="1.6" fill="currentColor" stroke="none"/>'
+  +'</svg>');
+
+/* Cozy botanical sprig (beside headline) */
+const ILLUS_SPRIG=(
+  '<svg viewBox="0 0 130 64" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">'
+  +'<path d="M8 56C42 50 78 38 118 10"/>'
+  +'<path d="M34 47c-4-8-2-14 6-18 3 8 1 14-6 18z"/>'
+  +'<path d="M56 39c-2-9 2-14 10-16 1 8-2 13-10 16z"/>'
+  +'<path d="M80 30c0-9 5-13 13-13-1 8-5 12-13 13z"/>'
+  +'<path d="M30 50c8-2 12-6 13-13"/>'
+  +'<circle cx="102" cy="16" r="2" fill="currentColor" stroke="none"/><circle cx="110" cy="10" r="1.6" fill="currentColor" stroke="none"/>'
+  +'</svg>');
+
+/* Cozy closing flourish */
+const ILLUS_FLOURISH=(
+  '<svg class="flourish" viewBox="0 0 90 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true">'
+  +'<path d="M4 10c18-6 34-8 41-4-4 4-10 5-16 3 6 2 16 2 22-1"/>'
+  +'<path d="M56 8c8-4 18-5 30-3"/>'
+  +'<path d="M70 5c2-2 5-2 7 0-2 2-5 2-7 0z"/>'
+  +'</svg>');
+
+/* Scandinavian minimal arcs */
+const ILLUS_SCANDI=(
+  '<svg viewBox="0 0 300 190" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">'
+  +'<circle cx="252" cy="40" r="64" opacity=".55"/>'
+  +'<circle cx="252" cy="40" r="44" opacity=".3" stroke-dasharray="1 6"/>'
+  +'<path d="M60 168h224" opacity=".5"/>'
+  +'<path d="M60 178h110" opacity=".25"/>'
+  +'<rect x="72" y="138" width="11" height="11" opacity=".45"/>'
+  +'<circle cx="138" cy="128" r="2.2" fill="currentColor" stroke="none" opacity=".5"/>'
+  +'</svg>');
+
+/* Empty state: open book */
+const ILLUS_EMPTY=(
+  '<svg viewBox="0 0 170 110" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+  +'<path d="M85 26c-14-8-30-9-48-4v62c18-5 34-4 48 4z"/>'
+  +'<path d="M85 26c14-8 30-9 48-4v62c-18-5-34-4-48 4z"/>'
+  +'<path d="M85 26v62"/>'
+  +'<path d="M52 42c8-1 15 0 22 3M52 56c8-1 15 0 22 3M118 42c-8-1-15 0-22 3M118 56c-8-1-15 0-22 3" opacity=".45"/>'
+  +'<path d="M20 96c40-8 90-8 130 0" opacity=".35"/>'
+  +'</svg>');
+
+/* Academia nav leaf sprigs */
+const NAV_LEAF=(
+  '<svg viewBox="0 0 24 44" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true">'
+  +'<path d="M12 42C12 26 14 14 22 4"/>'
+  +'<path d="M14 30c-5-1-8-4-9-9 5 1 8 4 9 9z"/>'
+  +'<path d="M15 20c-1-5 0-9 4-12 1 5 0 9-4 12z"/>'
+  +'<path d="M13 36c-5 0-9-2-11-6 5 0 9 2 11 6z"/>'
+  +'</svg>');
+
+/* Parchment underline flourish for the script note */
+const SCRIPT_SWASH=(
+  '<svg viewBox="0 0 80 10" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" aria-hidden="true">'
+  +'<path d="M2 7c14-5 30-6 48-3 10 1.6 20 1.4 28-.6"/>'
+  +'</svg>');
+</script>
+<script>
+'use strict';
+/* ============================== STATE ============================== */
+const LS_KEY='catchup-planner.v1';
+const EXAM_COLORS=['#8A4A56','#46697F','#66794F','#B4603A','#7A6FA0','#8A7448'];
+let S=null;
+
+function defaults(){return{
+  v:1, theme:'academia', mode:'auto',
+  capacity:3, badDay:false,
+  exams:[], sessions:[],
+  seq:1, xp:0, focusLog:{},
+  replannedAt:null, created:iso(new Date()),
+  screen:'today'
+};}
+function uid(p){ return p+'-'+(S.seq++); }
+function load(){
+  let d=defaults();
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ const j=JSON.parse(raw); d=Object.assign(d,j);
+      d.exams=Array.isArray(j.exams)?j.exams:[];
+      d.sessions=Array.isArray(j.sessions)?j.sessions:[];
+      d.focusLog=j.focusLog&&typeof j.focusLog==='object'?j.focusLog:{};
+      if(typeof d.xp!=='number'||!isFinite(d.xp)) d.xp=0;
+      if(!(d.capacity>0)) d.capacity=3;
+      // keep seq beyond any existing id suffix
+      let mx=10;
+      d.exams.concat(d.sessions).forEach(x=>{ const n=parseInt(String(x.id).split('-').pop(),10); if(n>=mx) mx=n+1; });
+      d.seq=mx;
+    }
+  }catch(e){ /* corrupted save: keep defaults, never wipe silently */ }
+  S=d;
+}
+function save(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(S)); }catch(e){ toast('Could not save — storage unavailable.'); } }
+
+/* ============================ COMPUTED ============================ */
+const examById=id=>S.exams.find(e=>e.id===id);
+const examsByDate=()=>S.exams.slice().sort((a,b)=>a.date<b.date?-1:1);
+const daysLeft=ex=>diffD(ex.date,tISO());
+const coverage=ex=>ex.topics.length? ex.topics.filter(t=>t.done).length/ex.topics.length : 0;
+const sessOfExam=exid=>S.sessions.filter(s=>s.examId===exid);
+const hoursLeftExam=ex=>sessOfExam(ex.id).filter(s=>!s.done).reduce((a,s)=>a+s.hours,0);
+function riskOf(ex){
+  const dl=daysLeft(ex);
+  if(dl<0) return {k:'past',label:'Past due'};
+  const need=hoursLeftExam(ex), cap=Math.max(.5,S.capacity*(S.badDay?0.5:1));
+  if(dl===0) return {k:'bad',label:'Exam today'};
+  // FIX #6: a fully prepared exam is never "Urgent"
+  if(ex.topics.length&&ex.topics.every(t=>t.done)&&need<=0) return {k:'ok',label:'On track'};
+  if(dl<=2) return {k:'bad',label:'Urgent'};
+  if(need>cap*dl) return {k:'bad',label:'At risk'};
+  if(need>cap*dl*0.65) return {k:'warn',label:'Tight'};
+  return {k:'ok',label:'On track'};
+}
+const sessionsOn=d=>S.sessions.filter(s=>s.date===d);
+const undonePast=()=>S.sessions.filter(s=>!s.done&&s.date<tISO())
+  .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.seq-b.seq);
+const todayList=()=>S.sessions.filter(s=>s.date===tISO())
+  .sort((a,b)=>(a.done?1:0)-(b.done?1:0)||a.seq-b.seq);
+function nextSession(){
+  const t=tISO();
+  const rank={}; examsByDate().forEach((e,i)=>rank[e.id]=i);
+  return S.sessions.filter(s=>!s.done&&s.date<=t)
+    .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(rank[a.examId]-rank[b.examId])||(a.seq-b.seq))[0]||null;
+}
+function partOf(s){
+  const list=sessOfExam(s.examId).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.seq-b.seq);
+  return {i:list.findIndex(x=>x.id===s.id)+1,n:list.length};
+}
+const todayPlanned=()=>sessionsOn(tISO()).reduce((a,s)=>a+s.hours,0);
+const studiedToday=()=>Math.max(S.sessions.filter(s=>s.done&&s.doneAt===tISO()).reduce((a,s)=>a+s.hours,0),(S.focusLog[tISO()]||0)/3600); // FIX #5: no double counting
+function catchupStatus(){
+  const t=tISO();
+  const planned=S.sessions.filter(s=>s.date<=t).reduce((a,s)=>a+s.hours,0);
+  const done=S.sessions.filter(s=>s.done&&s.date<=t).reduce((a,s)=>a+s.hours,0);
+  if(planned<=0) return {k:'ok',label:'No plan yet'};
+  const r=done/planned;
+  if(r>=0.9) return {k:'ok',label:'On pace'};
+  if(r>=0.6) return {k:'warn',label:'Building momentum'};
+  return {k:'bad',label:'Behind by '+fmtH(planned-done)};
+}
+const wholePlan=()=>{
+  const done=S.sessions.filter(s=>s.done).length, total=S.sessions.length;
+  return {done,total};
+};
+function calcStreak(){
+  const set=new Set(S.sessions.filter(s=>s.done&&s.doneAt).map(s=>s.doneAt));
+  let d=tISO(); if(!set.has(d)) d=addD(d,-1);
+  let c=0; while(set.has(d)){ c++; d=addD(d,-1); }
+  return c;
+}
+const levelInfo=()=>{ const per=120, lv=Math.floor(S.xp/per)+1, into=S.xp%per; return {lv,into,per,next:per-into}; };
+function last7(){ // rolling window: 3 days back .. today .. 3 days forward
+  const t=tISO();
+  const days=[];
+  for(let i=-3;i<=3;i++){
+    const d=addD(t,i);
+    const planned=sessionsOn(d).reduce((a,s)=>a+s.hours,0);
+    const done=S.sessions.filter(s=>s.done&&s.doneAt===d).reduce((a,s)=>a+s.hours,0);
+    days.push({date:d,planned,done,l1:DAYS[pIso(d).getDay()].slice(0,3),l2:pIso(d).getDate()+' '+MON3[pIso(d).getMonth()]});
+  }
+  return days;
+}
+const pace7=()=>{ const ds=last7(), t=tISO();
+  let p=0,c=0; ds.forEach(d=>{ if(d.date<=t){p+=d.planned;c+=d.done;} });
+  return p>0?c/p:0;
+};
+const nextExam=()=>examsByDate().find(e=>daysLeft(e)>=0)||null;
+
+/* ============================ RE-PLAN ============================ */
+function newSession(examId,topicId,title,hours,date){
+  return {id:uid('se'),examId,topicId,title,date:date||tISO(),hours:Math.round(hours*100)/100,
+    done:false,doneAt:null,checklist:[],notes:'',seq:S.seq++};
+}
+function replan(){
+  const t=tISO();
+  if(!S.exams.length){ toast('Add an exam first, then re-plan.'); return; }
+  // FIX #3: only plan for exams that have not happened yet
+  const order=examsByDate().filter(e=>daysLeft(e)>=0);
+  if(!order.length){ toast('No upcoming exams to plan for.'); return; }
+  const cap=Math.max(.5,S.capacity*(S.badDay?0.5:1));
+  const active=new Set(order.map(e=>e.id));
+  const pool=S.sessions.filter(s=>!s.done&&active.has(s.examId));
+  const fresh=[];
+  // synthesize sessions for active topics that have none
+  order.forEach(ex=>ex.topics.forEach(tp=>{
+    if(tp.done) return;
+    const has=S.sessions.some(s=>s.examId===ex.id&&s.topicId===tp.id);
+    if(!has){
+      const parts=Math.max(1,Math.ceil(tp.hrs/2));
+      // FIX #15: split in half-hour steps so the parts add up to the topic hours
+      let left=Math.max(1,Math.round(tp.hrs*2));
+      for(let i=0;i<parts;i++){
+        const h=Math.max(1,Math.ceil(left/(parts-i))); left-=h;
+        const ns=newSession(ex.id,tp.id,tp.name,h/2);
+        fresh.push(ns); pool.push(ns);
+      }
+    }
+  }));
+  if(!pool.length){ toast('Nothing to schedule \u2014 mark some topics as not-yet-studied.'); return; }
+  S.sessions.push.apply(S.sessions,fresh); // FIX #1: new sessions are now saved
+  const lastDate=order.reduce((m,e)=>e.date>m?e.date:m,order[0].date);
+  const days={}; const dayList=[];
+  for(let d=t;d<=lastDate;d=addD(d,1)){ days[d]=cap; dayList.push(d); }
+  // FIX #4: a session may only sit between today and the day before its exam
+  const allowed={};
+  order.forEach(e=>{ const lastOk=diffD(e.date,t)<=1?t:addD(e.date,-1); allowed[e.id]=dayList.filter(d=>d<=lastOk); });
+  const queues={}; order.forEach(e=>{ queues[e.id]=pool.filter(s=>s.examId===e.id).sort((a,b)=>a.seq-b.seq); });
+  let placed=0, overflow=0, ei=0, guard=pool.length*order.length+10;
+  while(placed<pool.length&&guard-->0){
+    const exId=order[ei%order.length].id; ei++;
+    const q=(queues[exId]||[]).find(s=>!s._p);
+    if(!q) continue;
+    const cand=allowed[exId];
+    let target=null,backup=cand[0],bestRem=-1;
+    for(const d of cand){
+      if(days[d]>=q.hours-1e-9){ target=d; break; }
+      if(days[d]>bestRem){ bestRem=days[d]; backup=d; }
+    }
+    if(target==null){ target=backup; overflow++; }
+    days[target]=Math.max(0,days[target]-q.hours);
+    q.date=target; q._p=true; placed++;
+  }
+  pool.forEach(s=>delete s._p);
+  S.replannedAt=new Date().toISOString();
+  save();
+  let msg='Re-planned '+pl(placed,'session')+' \u00b7 about '+fmtH(cap)+' per day';
+  if(overflow) msg+=' \u00b7 '+overflow+' day(s) exceed capacity';
+  toast(msg);
+  renderAll();
+}
+
+/* ============================ ACTIONS ============================ */
+function markDone(id,force){
+  const s=S.sessions.find(x=>x.id===id); if(!s) return;
+  s.done=(force===undefined)?!s.done:!!force;
+  s.doneAt=s.done?tISO():null;
+  S.xp=clamp(S.xp+(s.done?15:-15),0,1e9);
+  save();
+  if(s.done) toast('Done — +15 XP');
+  renderAll();
+}
+function toggleCheck(sid,cid){
+  const s=S.sessions.find(x=>x.id===sid); if(!s) return;
+  const c=s.checklist.find(x=>x.id===cid); if(!c) return;
+  c.done=!c.done; S.xp=clamp(S.xp+(c.done?3:-3),0,1e9); save(); renderAll();
+}
+function addCheck(sid,text){
+  const s=S.sessions.find(x=>x.id===sid); if(!s||!text.trim()) return;
+  s.checklist.push({id:uid('ck'),text:text.trim(),done:false}); save(); renderAll();
+  if($('#modal')&&!$('#overlay').hidden) openSession(s.id);
+}
+function saveNotes(sid,txt){ const s=S.sessions.find(x=>x.id===sid); if(s){ s.notes=txt; save(); } }
+function deleteSession(id){
+  const i=S.sessions.findIndex(x=>x.id===id); if(i<0) return;
+  S.sessions.splice(i,1); save(); closeModal(); toast('Session removed'); renderAll();
+}
+function setTheme(t){
+  S.theme=t; save();
+  document.documentElement.dataset.accent=t;
+  if(t==='academia'){ document.documentElement.dataset.mode='dark'; }
+  else applyMode();
+  renderAll();
+}
+function applyMode(){
+  const m=S.mode||'auto';
+  const dark=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.mode=dark?'dark':'light';
+}
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(S&&S.theme!=='academia'&&S.mode==='auto') applyMode(); }); }catch(e){}
+
+function exportICS(){
+  const up=S.sessions.filter(s=>!s.done&&s.date>=tISO()).sort((a,b)=>a.date<b.date?-1:1);
+  if(!up.length){ toast('No upcoming sessions to export.'); return; }
+  const escIC=s=>String(s).replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
+  const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  let out=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CatchUp Planner//EN','CALSCALE:GREGORIAN'];
+  up.forEach(s=>{
+    const ex=examById(s.examId); const p=partOf(s);
+    const ds=s.date.replace(/-/g,'');
+    out.push('BEGIN:VEVENT','UID:'+s.id+'@catchup-planner','DTSTAMP:'+stamp,
+      'DTSTART;VALUE=DATE:'+ds,'DTEND;VALUE=DATE:'+addD(s.date,1).replace(/-/g,''), // FIX #2
+      'SUMMARY:'+escIC('Study: '+(ex?ex.subject:'')+' — '+s.title+' ('+fmtH(s.hours)+')'),
+      'DESCRIPTION:'+escIC('Part '+p.i+' of '+p.n+' · '+s.checklist.filter(c=>c.done).length+'/'+s.checklist.length+' checklist items'),
+      'END:VEVENT');
+  });
+  out.push('END:VCALENDAR');
+  const blob=new Blob([out.join('\r\n')],{type:'text/calendar'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='catchup-plan.ics';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast(pl(up.length,'session')+' exported to calendar file.');
+}
+
+/* ------------------------------ DEMO ------------------------------ */
+function cl(text,done){ return {id:'ck-d'+(Math.random().toString(36).slice(2,8)),text,done:!!done}; }
+function loadDemo(){
+  const t=tISO();
+  const ex=(subj,dl,col,tps)=>({id:'ex-d'+subj.toLowerCase().slice(0,3),subject:subj,date:addD(t,dl),color:col,
+    topics:tps.map(([n,h,done])=>({id:'tp-'+subj.toLowerCase().slice(0,3)+'-'+n.toLowerCase().replace(/[^a-z]+/g,'').slice(0,8),name:n,hrs:h,done:!!done}))});
+  const exams=[
+    ex('Mathematics',12,'#8A4A56',[['Quadratic Equations',3,true],['Trigonometry',3,false],['Probability',2,false],['Calculus Basics',3,false],['Vectors',2,false]]),
+    ex('Physics',18,'#46697F',[['Kinematics',2.5,true],["Newton's Laws",2.5,true],['Energy & Work',2.5,false],['Circuits',2,false]]),
+    ex('History',25,'#66794F',[['Cold War Timeline',2,true],['Industrial Revolution',2,false],['Source Analysis',2,false]])
+  ];
+  const find=(i,n)=>exams[i].topics.find(x=>x.name.indexOf(n)===0);
+  const mk=(off,ei,tn,h,x)=>{ const tp=find(ei,tn);
+    return {id:'se-d'+off+'-'+ei+'-'+tn.toLowerCase().replace(/[^a-z]+/g,'').slice(0,6),examId:exams[ei].id,topicId:tp.id,
+      title:tp.name,date:addD(t,off),hours:h,done:!!(x&&x.done),doneAt:(x&&x.done)?addD(t,off):null,
+      checklist:(x&&x.cl)||[],notes:(x&&x.notes)||'',seq:0}; };
+  const sessions=[
+    mk(-3,0,'Quadratic',2,{done:true,cl:[cl('Review 6 worked examples',true),cl('20 practice problems',true)]}),
+    mk(-3,1,'Kinematics',1.5,{done:true,cl:[cl('Graphs of motion',true)]}),
+    mk(-2,0,'Trigonometry',1.5,{done:true}),
+    mk(-2,2,'Cold War',1.5,{done:true,cl:[cl('Timeline notes',true),cl('Key dates flashcards',true)]}),
+    mk(-1,1,'Newton',2,{done:true}),
+    mk(-1,0,'Probability',1.5,{done:true,cl:[cl('Tree diagrams',true)]}),
+    mk(0,0,'Vectors',1.5,{cl:[cl('Revise dot & cross product'),cl('12 practice problems'),cl('Mark last quiz')],notes:'Start from the exam formula sheet.'}),
+    mk(0,2,'Industrial',1.5),
+    mk(1,0,'Calculus',2),
+    mk(1,1,'Energy',1.5),
+    mk(2,0,'Trigonometry',1.5),
+    mk(2,2,'Source',1.5),
+    mk(3,1,'Circuits',2),
+    mk(4,0,'Vectors',1.5),
+    mk(5,2,'Industrial',1.5),
+    mk(6,1,'Energy',1.5),
+    mk(6,0,'Probability',1.5),
+    mk(8,0,'Calculus',2),
+    mk(9,1,'Circuits',1.5)
+  ];
+  sessions.forEach((s,i)=>s.seq=500+i);
+  let xp=0; sessions.forEach(s=>{ if(s.done){ xp+=15; s.checklist.forEach(c=>{ if(c.done) xp+=3; }); } });
+  S=Object.assign(defaults(),{
+    theme:S.theme, mode:S.mode, capacity:S.capacity||3, badDay:S.badDay,
+    exams, sessions, xp, focusLog:S.focusLog||{}, replannedAt:new Date().toISOString(),
+    seq:900, created:S.created
+  });
+  save(); renderAll();
+  toast('Demo data loaded — 3 exams, '+sessions.length+' sessions.');
+}
+
+/* ============================== CHROME ============================== */
+const NAVS=[['today','Today','home'],['plan','Plan','calendar'],['progress','Progress','pulse'],['exams','Exams','book'],['settings','Settings','gear']];
+function renderChrome(){
+  const st=calcStreak();
+  $('#topbarIn').innerHTML=
+    '<div class="brand" data-action="go" data-nav="today" role="button" tabindex="0" aria-label="CatchUp Planner home">'+brandLogo()+
+    '<div class="brand-name"><b>CatchUp</b><span>Planner</span></div></div>'
+    +'<div class="topbar-right">'
+    +'<div class="streak-chip" title="Day streak">'+icon('flame',17)+'<div><b class="num">'+st+'d</b><small>Streak</small></div></div>'
+    +'<button class="icon-btn lined" data-action="replan" aria-label="Re-plan" title="Re-plan">'+icon('refresh')+'</button>'
+    +'<button class="icon-btn" data-action="go" data-nav="settings" aria-label="Settings menu">'+icon('dots')+'</button>'
+    +'</div>';
+  const cur=S.screen||'today';
+  $('#navIn').innerHTML=
+    (document.documentElement.dataset.accent==='academia'?'<span class="navleaf l">'+NAV_LEAF+'</span><span class="navleaf r">'+NAV_LEAF+'</span>':'')
+    +NAVS.map(n=>'<button class="nav-btn'+(cur===n[0]?' on':'')+'" data-action="go" data-nav="'+n[0]+'" aria-label="'+n[1]+'"'+(cur===n[0]?' aria-current="page"':'')+'>'+icon(n[2],21)+'<span>'+n[1]+'</span></button>').join('');
+}
+
+/* ============================== MODALS ============================== */
+function openModal(html){ $('#modal').innerHTML=html; $('#overlay').hidden=false; document.body.style.overflow='hidden'; }
+function closeModal(){
+  // FIX #9: never lose focus time when the modal is closed any way
+  let flushed=false;
+  try{ if(typeof F!=='undefined'&&F&&F.sid&&(F.unlogged>0||F.running)){ focusTick(); F.running=false; logFocus(true); flushed=true; } }catch(e){}
+  $('#overlay').hidden=true; $('#modal').innerHTML=''; document.body.style.overflow=''; stopFocusTick();
+  if(flushed) renderAll();
+}
+let toastTimer=null;
+function toast(msg){
+  const w=$('#toastWrap'); w.innerHTML='<div class="toast">'+esc(msg)+'</div>';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ w.innerHTML=''; },2800);
+}
+</script>
+<script>
+'use strict';
+/* ============================ SHARED UI ============================ */
+function accent(){ return document.documentElement.dataset.accent; }
+function metaLine(parts){ return parts.filter(Boolean).map(p=>'<span>'+p+'</span>').join('<span class="dot" aria-hidden="true"></span>'); }
+function masthead(o){
+  let title=o.title;
+  if(accent()==='cozy'&&/\.$/.test(title)&&!o.plain) title=title.replace(/\.$/,'<span class="tdot">.</span>');
+  return '<header class="masthead">'
+    +(o.meta?'<div class="mast-meta">'+o.meta+'</div>':'')
+    +(o.tag?'<div class="eyebrow mast-eyebrow">'+o.tag+'</div>':'')
+    +'<h1 class="headline">'+title+'</h1>'
+    +(o.sub?'<p class="mast-sub">'+o.sub+'</p>':'')
+    +(o.actions?'<div class="mast-actions">'+o.actions+'</div>':'')
+    +(o.illus?'<div class="mast-illus" aria-hidden="true">'+o.illus+'</div>':'')
+    +'</header>';
+}
+function mastIllus(){ const a=accent(); return a==='scandinavian'?ILLUS_SCANDI:(a==='cozy'?ILLUS_SPRIG:ILLUS_ACADEMIA); }
+function chapter(t,aux){
+  return '<div class="chapter"><h2>'+t+'</h2><span class="rule" aria-hidden="true"></span>'+(aux?'<span class="aux">'+aux+'</span>':'')+'</div>';
+}
+function subjectChip(ex){
+  if(!ex) return '';
+  return '<span class="chip"><span class="cdot" style="background:'+esc(ex.color)+'"></span>'+esc(ex.subject)+'</span>';
+}
+function segs(p){
+  const on=clamp(Math.round(p*5),0,5); let s='<span class="segs" aria-hidden="true">';
+  for(let i=0;i<5;i++) s+='<i class="'+(i<on?'on':'')+'"></i>';
+  return s+'</span>';
+}
+function riskChip(r){ return '<span class="chip '+r.k+'">'+r.label+'</span>'; }
+function daysLabel(ex){
+  const d=daysLeft(ex);
+  return d<0?'Past due':d===0?'Exam today':d===1?'1 day left':d+' days left';
+}
+function emptyBlock(){
+  return '<div class="panel"><div class="empty"><span class="illus" style="color:var(--muted)">'+ILLUS_EMPTY+'</span>'
+    +'<h3>Let\u2019s build your catch-up plan</h3>'
+    +'<p>Add your exams and topics, and CatchUp will spread balanced study days across the weeks leading up to each exam.</p>'
+    +'<div class="card-btns"><button class="btn btn-primary" data-action="load-demo">'+icon('sparkle',18)+'Load demo data</button>'
+    +'<button class="btn btn-outline" data-action="add-exam">'+icon('plus',18)+'Add your first exam</button></div>'
+    +'</div></div>';
+}
+
+/* ============================== TODAY ============================== */
+function startCardHTML(s){
+  const ex=examById(s.examId); const p=partOf(s);
+  const ckd=s.checklist.filter(c=>c.done).length;
+  const quoteSrc=s.checklist.length? s.checklist.slice(0,2).map(c=>c.text).join(' \u00b7 ') : (s.notes||'').split('\n')[0];
+  return '<div class="card card-start '+(accent()==='academia'?'parchment':'')+'">'
+    +'<div class="card-kicker">Start here</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+subjectChip(ex)+'</div>'
+    +'<h3 class="sess-title" style="margin-top:10px">'+esc(s.title)+'</h3>'
+    +'<div class="sess-meta"><span class="num">'+fmtH(s.hours)+'</span><span>Part '+p.i+' of '+p.n+'</span><span>'+ckd+' of '+s.checklist.length+' checklist</span></div>'
+    +(quoteSrc?'<p class="quote">Key concepts: \u201c'+esc(quoteSrc)+'\u201d</p>':'')
+    +'<div class="card-btns">'
+    +'<button class="btn btn-primary" data-action="start-focus" data-id="'+s.id+'">'+icon('timer',18)+'Start Focus</button>'
+    +'<button class="btn btn-outline" data-action="mark-done" data-id="'+s.id+'">'+icon('check',18)+'Mark Done</button>'
+    +'<button class="btn btn-text" data-action="open-session" data-id="'+s.id+'">Notes</button>'
+    +'</div></div>';
+}
+function progressCardHTML(){
+  const t=tISO(); const list=sessionsOn(t);
+  const planned=todayPlanned()||0, studied=studiedToday();
+  const doneN=list.filter(s=>s.done).length, totalN=list.length;
+  const cap=S.capacity*(S.badDay?0.5:1);
+  const st=catchupStatus(); const wp=wholePlan();
+  const denom=planned>0?planned:cap;
+  const p=denom>0?clamp(studied/denom,0,1):0;
+  return '<div class="card card-progress">'
+    +'<div class="card-kicker">Today\u2019s study</div>'
+    +'<div class="bigstat num">'+fmtH(studied)+(planned>0?' <small>/ '+fmtH(planned)+' studied</small>':' <small>studied</small>')+'</div>'
+    +'<div class="bar thin" style="margin-top:12px"><i style="width:'+(p*100)+'%"></i></div>'
+    +'<div class="mini-rows">'
+    +'<div class="mini-row"><span>Sessions</span><b class="num">'+doneN+' of '+totalN+' done</b></div>'
+    +'<div class="mini-row"><span>Remaining today</span><b class="num">'+fmtH(Math.max(0,planned-S.sessions.filter(s=>s.done&&s.date===t).reduce((a,s)=>a+s.hours,0)))+'</b></div>'
+    +'<div class="mini-row"><span>Catch-up status</span><b>'+esc(st.label)+'</b></div>'
+    +'<div class="mini-row"><span>Whole plan</span><b class="num">'+wp.done+' of '+wp.total+' sessions done</b></div>'
+    +'</div></div>';
+}
+function upNextCardHTML(){
+  const t=tISO();
+  const s=S.sessions.filter(x=>!x.done&&x.date>t).sort((a,b)=>a.date<b.date?-1:1)[0];
+  if(!s) return '';
+  const ex=examById(s.examId);
+  return '<div class="card card-upnext">'
+    +'<div class="card-kicker" style="margin-bottom:8px">Up next</div>'
+    +'<div style="display:flex;align-items:flex-start;gap:10px">'
+    +'<div style="flex:1;min-width:0"><h3 class="sess-title" style="font-size:1.2rem">'+esc(s.title)+'</h3>'
+    +'<div class="sess-meta" style="margin-top:4px"><span class="num">'+fmtH(s.hours)+'</span><span>'+esc(ex?ex.subject:'')+'</span><span>'+fmtD(s.date)+'</span></div></div>'
+    +'<button class="round-arrow" data-action="open-session" data-id="'+s.id+'" aria-label="Open session">'+icon('arrowr',17)+'</button>'
+    +'</div></div>';
+}
+function srowHTML(s,opts){
+  opts=opts||{};
+  const ex=examById(s.examId); const p=partOf(s);
+  const ck=s.checklist.filter(c=>c.done).length;
+  const urgent=!s.done&&ex&&(daysLeft(ex)<=3);
+  return '<button class="srow'+(s.done?' done':'')+(urgent?' urgent':'')+'" data-action="open-session" data-id="'+s.id+'">'
+    +'<span class="seq num" aria-hidden="true">'+(opts.seq!=null?pad(opts.seq):'\u2013')+'</span>'
+    +'<span class="st"><b>'+esc(s.title)+'</b>'
+    +'<small>'+(ex?'<span class="subj">'+esc(ex.subject)+'</span> \u00b7 ':'')
+    +(opts.carried?'carried from '+fmtD(s.date)+' \u00b7 ':'')
+    +(opts.compact?'<span class="num">'+fmtH(s.hours)+'</span>'
+      :'<span class="num">'+fmtH(s.hours)+' \u00b7 Part '+p.i+' of '+p.n+(s.checklist.length?' \u00b7 '+ck+'/'+s.checklist.length+' list':'')+'</span>')+'</small></span>'
+    +'<span class="donebtn '+(s.done?'on':'')+'" data-action="mark-done" data-id="'+s.id+'" role="button" aria-label="'+(s.done?'Mark not done':'Mark done')+'" tabindex="0">'+icon('check',18)+'</span>'
+    +'</button>';
+}
+function readinessRows(){
+  if(!S.exams.length) return '<p class="muted tiny" style="padding:10px 2px">No exams yet — add one from the Exams tab.</p>';
+  return '<div class="exrows">'+examsByDate().map(ex=>{
+    const r=riskOf(ex);
+    return '<div class="exrow'+(r.k==='bad'?' urgent':'')+'">'
+      +'<span class="cdot" style="background:'+esc(ex.color)+'"></span>'
+      +'<span class="nm"><b>'+esc(ex.subject)+'</b><small>'+daysLabel(ex)+' \u00b7 '+fmtH(hoursLeftExam(ex))+' to cover</small></span>'
+      +'<span class="cov num"><b>'+pct(coverage(ex))+'</b> ready</span>'
+      +riskChip(r)+segs(coverage(ex))
+      +'</div>';
+  }).join('')+'</div>';
+}
+function renderToday(){
+  const el=$('#screen-today');
+  const t=tISO(); const now=new Date();
+  const meta=metaLine([
+    DAYS[now.getDay()]+', '+now.getDate()+' '+MONTHS[now.getMonth()],
+    nextExam()?'Next exam in <b class="num">'+pl(daysLeft(nextExam()),'day')+'</b>':null,
+    '<b class="num">'+calcStreak()+'-day</b>&nbsp;streak',
+    'Level <b class="num">'+levelInfo().lv+'</b>'
+  ]);
+  const ne=nextExam();
+  const tags={
+    academia:'Your path forward', scandinavian:'Today', // FIX #7
+    cozy:'On today\u2019s schedule'
+  };
+  let mast;
+  const planned=todayPlanned();
+  const headline=(!S.sessions.length)?'Good '+greeting()+'! Let\u2019s get set up.'
+    :(planned>0?'Good '+greeting()+'! '+fmtH(planned)+' of study planned today.'
+    :'Good '+greeting()+'! Nothing scheduled today.');
+  const over=undonePast();
+  const tl=todayList();
+  const cap=S.capacity*(S.badDay?0.5:1);
+  const st=catchupStatus();
+  const sub=(!S.exams.length)?'Add your exams and topics, then re-plan to generate balanced study days.'
+    :((over.length?pl(over.length,'session')+' carried forward \u00b7 ':'')+tl.filter(s=>!s.done).length+' of '+tl.length+' sessions remaining \u00b7 '+fmtH(cap)+' capacity \u00b7 '+st.label);
+  mast=masthead({tag:tags[accent()],meta,title:headline,sub,illus:mastIllus()});
+  if(!S.exams.length&&!S.sessions.length){ el.innerHTML=mast+emptyBlock(); return; }
+  const ns=nextSession();
+  const startBlock=(ns?startCardHTML(ns):'<div class="card card-start '+(accent()==='academia'?'parchment':'')+'"><div class="card-kicker">Start here</div><h3 class="sess-title">All caught up</h3><p class="muted" style="margin-top:6px;font-size:.92rem">Nothing due right now. Re-plan to fit any new topics into the days ahead.</p><div class="card-btns"><button class="btn btn-primary" data-action="replan">'+icon('refresh',18)+'Re-plan</button></div></div>');
+  const progBlock=progressCardHTML();
+  const readiness='<div class="panel dark-open">'+chapter('Exam readiness',S.exams.length?esc(examsByDate()[0].subject)+' first':'')+readinessRows()+'</div>';
+  let sessionsBlock='';
+  if(over.length||tl.length){
+    sessionsBlock=chapter('Today\u2019s sessions',tl.length?tl.filter(s=>!s.done).length+' to go':'');
+    if(over.length) sessionsBlock+='<div class="panel dark-open"><p class="tiny muted" style="margin:2px 0 4px">Overdue \u2014 carried forward by re-plan</p><div class="slist">'+over.slice(0,6).map((s,i)=>srowHTML(s,{seq:i+1})).join('')+'</div></div>';
+    if(tl.length){
+      const wrapClass=accent()==='cozy'?'ruled':'panel'+(accent()==='academia'?' parchment':'');
+      sessionsBlock+='<div class="'+wrapClass+'" style="margin-top:10px"><div class="slist">'+tl.map((s,i)=>srowHTML(s,{seq:i+1,compact:accent()==='cozy'})).join('')+'</div></div>';
+    }
+    if(accent()==='cozy') sessionsBlock+='<p class="closing-line">Small steps, steady season.'+ILLUS_FLOURISH+'</p>';
+  }
+  let body='';
+  if(accent()==='cozy'){
+    body='<div class="cozy-split"><div class="col-a">'
+      +'<div class="feature-row">'+icon('target',17)+'<span>Next exam: <b>'+(ne?esc(ne.subject)+' \u00b7 '+daysLabel(ne):'none scheduled')+'</b></span></div>'
+      +'<div class="feature-row">'+icon('flame',17)+'<span><b class="num">'+calcStreak()+'-day</b>&nbsp;streak going</span></div>'
+      +'<div class="feature-row">'+icon('star',17)+'<span>Level <b class="num">'+levelInfo().lv+'</b> \u00b7 <b class="num">'+S.xp+'</b>&nbsp;XP</span></div>'
+      +'<div class="card-btns" style="margin-top:14px"><button class="btn btn-primary" data-action="'+(ns?'start-focus':'replan')+'" '+(ns?'data-id="'+ns.id+'"':'')+'>'+icon('timer',18)+(ns?'Start focusing':'Generate plan')+'</button></div>'
+      +'</div><div class="col-b"><div class="cards-scene">'+ILLUS_TREE+'<div class="hero-cards">'
+      +startBlock+progBlock+upNextCardHTML()
+      +'</div></div></div></div>'+readiness+sessionsBlock;
+  }else if(accent()==='scandinavian'){
+    body='<div class="scandi-split"><div class="col-a">'+startBlock+'</div><div class="col-b">'+progBlock+'</div></div>'
+      +readiness+sessionsBlock;
+  }else{
+    body='<div class="hero-cards">'+startBlock+progBlock+'</div>'+readiness+sessionsBlock;
+  }
+  el.innerHTML=mast+body;
+}
+
+/* ============================== PLAN ============================== */
+function chartSVG(days){
+  const compact=window.innerWidth<560;
+  const W=compact?360:640, H=compact?238:252, L=compact?30:44, B=compact?192:206, T=16;
+  const fs1=compact?10:11, fs2=compact?9.5:10.5;
+  const mx=Math.max(...days.map(d=>Math.max(d.planned,d.done)),2);
+  const max=Math.max(2,Math.ceil(mx/2)*2);
+  const stepv=max>8?4:2;
+  const n=days.length, step=(W-L-14)/n;
+  let g='';
+  for(let v=0;v<=max;v+=stepv){
+    const y=B-(v/max)*(B-T);
+    g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-6)+'" y2="'+y+'" stroke="currentColor" stroke-opacity=".13" stroke-width="1"/>'
+     +'<text x="'+(L-6)+'" y="'+(y+3.5)+'" text-anchor="end" font-size="'+fs1+'" fill="currentColor" fill-opacity=".55" font-variant-numeric="tabular-nums">'+v+'h</text>';
+  }
+  days.forEach((d,i)=>{
+    const cx=L+7+i*step+step/2;
+    const bw=Math.min(compact?17:26,step*0.36), dw=Math.min(compact?7:11,step*0.15);
+    if(d.planned>0){ const h=Math.max(3,(d.planned/max)*(B-T));
+      g+='<rect x="'+(cx-bw-2)+'" y="'+(B-h)+'" width="'+bw+'" height="'+h+'" rx="'+(compact?3:4)+'" style="fill:var(--chart-planned,#C9A96A)"/>'; }
+    if(d.done>0){ const h2=Math.max(3,(d.done/max)*(B-T));
+      g+='<rect x="'+(cx+3)+'" y="'+(B-h2)+'" width="'+dw+'" height="'+h2+'" rx="'+(compact?2:3)+'" style="fill:var(--chart-done,#6E8464)"/>'; }
+    g+='<text x="'+cx+'" y="'+(B+15)+'" text-anchor="middle" font-size="'+fs1+'" fill="currentColor" fill-opacity=".8">'+d.l1+'</text>'
+     +'<text x="'+cx+'" y="'+(B+(compact?26:31))+'" text-anchor="middle" font-size="'+fs2+'" fill="currentColor" fill-opacity=".5" font-variant-numeric="tabular-nums">'+d.l2+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Planned and completed hours, three days back to three days ahead">'+g+'</svg>';
+}
+function examRowHTML(ex){
+  const d=daysLeft(ex); const cov=coverage(ex);
+  const tile='<span class="exam-tile" style="background:'+esc(ex.color)+'">'+icon('book',19)+'</span>';
+  const chipCls=d<=3?'days':(d<=10?'soon':'');
+  return '<div class="exrow'+(d>=0&&d<=3?' urgent':'')+'">'+tile
+    +'<span class="nm"><b>'+esc(ex.subject)+'</b><small>'+ex.topics.filter(t=>t.done).length+' of '+ex.topics.length+' topics ready \u00b7 '+fmtH(hoursLeftExam(ex))+' to cover</small></span>'
+    +'<span class="cov tiny num" style="display:flex;align-items:center;gap:6px">'+icon('calendar',14)+fmtD(ex.date,true)+'</span>'
+    +'<span class="chip '+chipCls+' num">'+daysLabel(ex)+'</span>'
+    +'</div>';
+}
+function insightMessage(){
+  const wp=wholePlan(); const over=undonePast().length;
+  if(!S.sessions.length) return 'Add exams with topics, then re-plan \u2014 CatchUp will lay out balanced study days for you.';
+  if(over>0) return 'You have '+over+' session'+(over===1?'':'s')+' carried forward. Re-plan to spread them evenly over the coming days.';
+  const p=pace7();
+  if(p>=0.9) return 'Strong week \u2014 you\u2019re keeping up with the plan. Hold the rhythm and the exams will feel calm.';
+  if(p>=0.6) return 'You\u2019re not behind \u2014 you\u2019re just building momentum. A consistent routine will help you catch up and stay ahead.';
+  return 'Every finished session counts. Start with today\u2019s first task \u2014 small daily wins rebuild the lead.';
+}
+function renderPlan(){
+  const el=$('#screen-plan');
+  const ds=last7();
+  const planned7=ds.reduce((a,d)=>a+d.planned,0), done7=ds.reduce((a,d)=>a+d.done,0);
+  const wp=wholePlan(); const overall=wp.total?wp.done/wp.total:0;
+  const t=tISO();
+  const mast=masthead({
+    tag:'Your path forward',
+    title:'Study Roadmap',
+    sub:'Day-by-day balanced schedule leading up to your exams.',
+    illus:mastIllus(),
+    actions:'<button class="btn btn-accent" data-action="export-ics">'+icon('calendar',18)+'Export to Calendar</button>'
+      +'<button class="btn btn-dark" data-action="print-plan">'+icon('printer',18)+'Print / PDF</button>'
+      +'<button class="btn btn-outline" data-action="replan">'+icon('refresh',18)+'Re-plan</button>'
+  });
+  if(!S.exams.length&&!S.sessions.length){ el.innerHTML=mast+emptyBlock(); return; }
+  const ns=nextSession();
+  const prog='<div class="panel parchment" style="margin-top:14px">'
+    +'<div class="panel-h"><span class="pic">'+icon('bars',18)+'</span><h3>Study Progress</h3>'
+    +'<span class="script-note" aria-hidden="true">Small steps<br>create big results'+SCRIPT_SWASH+'</span></div>'
+    +'<div class="metric-row three parchment">'
+    +'<div class="metric parchment">'+icon('calendar',20)+'<span class="lbl">Planned &middot; 7 days</span><span class="val num">'+(Math.round(planned7*10)/10)+' <small>hrs</small></span></div>'
+    +'<div class="metric parchment">'+icon('check',20)+'<span class="lbl">Completed &middot; 7 days</span><span class="val num">'+(Math.round(done7*10)/10)+' <small>hrs</small></span></div>'
+    +'<div class="metric parchment">'+icon('target',20)+'<span class="lbl">Pacing Rate</span><span class="val num">'+pct(pace7())+'</span></div>'
+    +'</div>'
+    +'<div class="bar knob" style="margin-top:16px"><i style="width:'+(overall*100)+'%"></i></div>'
+    +'<div class="prog-caption"><span class="num">'+wp.done+' / '+wp.total+' tasks completed</span>'
+    +'<span class="big num">'+pct(overall)+'<small>Overall Progress</small></span></div>'
+    +'</div>';
+  const chart='<div class="panel gold-edge">'
+    +'<div class="panel-h"><span class="pic">'+icon('bars',18)+'</span><h3>Your Study Roadmap</h3>'
+    +'<span class="legend"><span class="lp"><i></i>Planned</span><span class="lc"><i></i>Completed</span></span></div>'
+    +'<div class="chart-wrap" style="color:var(--text)">'+chartSVG(ds)+'</div></div>';
+  const insights='<div class="panel gold-edge">'
+    +'<div class="panel-h"><span class="pic">'+icon('bulb',18)+'</span><h3>Study Insights</h3></div>'
+    +'<p class="insight-txt">'+insightMessage()+'</p>'
+    +'<div class="nextfocus"><div class="nf-lbl">'+icon('target',17)+'Next Focus</div>'
+    +'<p>'+(ns?esc(ns.title)+' \u00b7 '+esc((examById(ns.examId)||{}).subject||'')+' \u00b7 '+fmtH(ns.hours)+' \u2014 complete today\u2019s study plan to keep your momentum going.':'All caught up. Add topics or enjoy the evening.')+'</p></div>'
+    +'<button class="btn btn-primary btn-block" style="margin-top:16px" data-action="go" data-nav="today"><span style="transform:scaleX(-1);display:inline-flex">'+icon('arrowr',18)+'</span>View Today\u2019s Plan</button>'
+    +'</div>';
+  const exams=S.exams.length?'<div class="panel parchment" style="margin-top:20px">'
+    +'<div class="panel-h"><span class="pic">'+icon('book',18)+'</span><h3>Upcoming Exams</h3>'
+    +'<button class="btn-text side" data-action="go" data-nav="exams" style="display:inline-flex;align-items:center;gap:6px">View All '+icon('arrowr',15)+'</button></div>'
+    +'<div class="exrows">'+examsByDate().slice(0,4).map(examRowHTML).join('')+'</div>'
+    +'<span class="leaf-deco" aria-hidden="true">'+NAV_LEAF.replace('viewBox="0 0 24 44"','viewBox="0 0 24 44" width="74" height="96"')+'</span>'
+    +'</div>':'';
+  el.innerHTML=mast+prog+'<div class="plan-grid" style="margin-top:20px">'+chart+insights+'</div>'+exams;
+}
+let _rzT=null;
+window.addEventListener('resize',()=>{ clearTimeout(_rzT); _rzT=setTimeout(()=>{ const a=document.activeElement; if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; /* FIX #11 */ if(S) renderAll(); },220); });
+</script>
+<script>
+'use strict';
+/* ============================ PROGRESS ============================ */
+function streakStrip(){
+  const t=tISO(); let out='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px 6px;margin-top:8px;max-width:340px">';
+  for(let i=13;i>=0;i--){
+    const d=addD(t,-i); const done=S.sessions.some(s=>s.done&&s.doneAt===d);
+    out+='<div style="text-align:center">'
+      +'<div style="width:13px;height:13px;border-radius:50%;margin:0 auto 4px;'+(done?'background:var(--ok)':'border:1.4px solid var(--line)')+'"></div>'
+      +'<span class="tiny muted num" style="font-size:.6rem">'+DAYS[pIso(d).getDay()][0]+'<br>'+pIso(d).getDate()+'</span></div>';
+  }
+  return out+'</div>';
+}
+function renderProgress(){
+  const el=$('#screen-progress');
+  const lv=levelInfo(); const wp=wholePlan();
+  const hoursAll=S.sessions.filter(s=>s.done).reduce((a,s)=>a+s.hours,0);
+  const streak=calcStreak();
+  const meta=metaLine([
+    '<b class="num">'+wp.done+'</b> of <b class="num">'+wp.total+'</b> sessions done',
+    '<b class="num">'+(Math.round(hoursAll*10)/10)+'h</b> studied',
+    '<b class="num">'+streak+'-day</b>&nbsp;streak'
+  ]);
+  const tags={academia:'Your momentum',scandinavian:'Progress',cozy:'How the season unfolds'};
+  const mast=masthead({tag:tags[accent()],meta,title:'Progress',sub:'Streaks, XP and honest numbers \u2014 everything here is counted from what you actually finish.',illus:mastIllus()});
+  if(!S.exams.length&&!S.sessions.length){ el.innerHTML=mast+emptyBlock(); return; }
+  const covRows=examsByDate().map(ex=>{
+    const c=coverage(ex); const r=riskOf(ex);
+    return '<div style="padding:11px 2px;border-bottom:1px solid var(--line)">'
+      +'<div style="display:flex;align-items:center;gap:8px"><span class="cdot" style="width:10px;height:10px;border-radius:50%;background:'+esc(ex.color)+'"></span>'
+      +'<b style="flex:1;font-size:.95rem">'+esc(ex.subject)+'</b><span class="tiny muted">'+daysLabel(ex)+'</span></div>'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-top:7px"><div class="bar thin" style="flex:1"><i style="width:'+(c*100)+'%"></i></div>'
+      +'<span class="num tiny" style="min-width:34px;text-align:right">'+pct(c)+'</span></div></div>';
+  }).join('');
+  const momentum='<div class="panel parchment">'
+    +'<div class="panel-h"><span class="pic">'+icon('star',18)+'</span><h3>Momentum</h3><span class="side num">Level '+lv.lv+'</span></div>'
+    +'<div style="display:flex;align-items:baseline;gap:8px"><span class="bigstat num" style="font-size:2.2rem">'+S.xp+'</span><span class="muted tiny">XP total</span></div>'
+    +'<div class="bar thin" style="margin-top:12px"><i style="width:'+(lv.into/lv.per*100)+'%"></i></div>'
+    +'<p class="tiny muted" style="margin-top:6px"><span class="num">'+lv.next+'</span> XP to Level '+(lv.lv+1)+'</p>'
+    +'<div class="metric-row parchment" style="margin-top:8px">'
+    +'<div class="metric parchment">'+icon('check',20)+'<span class="lbl">Sessions completed</span><span class="val num">'+wp.done+'</span></div>'
+    +'<div class="metric parchment">'+icon('clock',20)+'<span class="lbl">Hours studied</span><span class="val num">'+(Math.round(hoursAll*10)/10)+'<small>h</small></span></div>'
+    +'<div class="metric parchment">'+icon('flame',20)+'<span class="lbl">Current streak</span><span class="val num">'+streak+'<small>d</small></span></div>'
+    +'</div></div>';
+  const readiness='<div class="panel gold-edge"><div class="panel-h"><span class="pic">'+icon('target',18)+'</span><h3>Exam readiness</h3></div>'+covRows+'</div>';
+  const ds=last7();
+  const chart='<div class="panel gold-edge" style="margin-top:20px">'
+    +'<div class="panel-h"><span class="pic">'+icon('bars',18)+'</span><h3>Study activity \u2014 3 days back, 3 ahead</h3>'
+    +'<span class="legend"><span class="lp"><i></i>Planned</span><span class="lc"><i></i>Completed</span></span></div>'
+    +'<div class="chart-wrap" style="color:var(--text)">'+chartSVG(ds)+'</div></div>';
+  el.innerHTML=mast
+    +'<div class="prog-split" style="margin-top:14px"><div>'+momentum+'</div><div>'+readiness+'</div></div>'
+    +chart
+    +'<div class="panel gold-edge" style="margin-top:20px"><div class="panel-h"><span class="pic">'+icon('flame',18)+'</span><h3>Last 14 days</h3><span class="side">'+streak+'-day streak</span></div>'+streakStrip()+'</div>';
+}
+
+/* ============================== EXAMS ============================== */
+function examPanelHTML(ex){
+  const cov=coverage(ex); const r=riskOf(ex); const d=daysLeft(ex);
+  const topics=ex.topics.map(tp=>
+    '<div class="checkrow">'
+    +'<button class="box '+(tp.done?'on':'')+'" data-action="toggle-topic" data-eid="'+ex.id+'" data-tid="'+tp.id+'" aria-label="Toggle topic">'+icon('check',14)+'</button>'
+    +'<span>'+esc(tp.name)+'</span>'
+    +'<span class="tiny muted num">'+fmtH(tp.hrs||2)+'</span>'
+    +'<button class="icon-btn" style="width:34px;height:34px" data-action="del-topic" data-eid="'+ex.id+'" data-tid="'+tp.id+'" aria-label="Remove topic">'+icon('x',15)+'</button>'
+    +'</div>').join('');
+  return '<div class="panel '+(accent()==='academia'?'parchment':'')+'" style="margin-top:14px;border-left:3px solid '+esc(ex.color)+'">'
+    +'<div class="panel-h"><span class="exam-tile" style="background:'+esc(ex.color)+'">'+icon('book',19)+'</span>'
+    +'<h3>'+esc(ex.subject)+'</h3>'+riskChip(r)+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">'
+    +'<span class="chip num">'+icon('calendar',13)+fmtD(ex.date,true)+'</span>'
+    +'<span class="chip num '+((d>=0&&d<=3)?(accent()==='academia'?'days':'bad'):'')+'">'+daysLabel(ex)+'</span>'
+    +'<span class="chip num">'+pct(cov)+' topics ready</span></div>'
+    +'<div class="bar thin"><i style="width:'+(cov*100)+'%"></i></div>'
+    +'<div style="margin-top:12px">'+(topics||'<p class="tiny muted">No topics yet \u2014 add what the exam covers.</p>')+'</div>'
+    +'<div class="addcheck"><input class="topic-in" data-eid="'+ex.id+'" type="text" placeholder="Add a topic (e.g. Vectors, 2.5)" aria-label="New topic">'
+    +'<button class="btn btn-ghost btn-sm" data-action="add-topic" data-eid="'+ex.id+'">'+icon('plus',16)+'Add</button></div>'
+    +'<div class="card-btns">'
+    +'<button class="btn btn-ghost btn-sm" data-action="add-session" data-eid="'+ex.id+'">'+icon('plus',16)+'Add session</button>'
+    +'<button class="btn btn-text btn-sm" data-action="edit-exam" data-id="'+ex.id+'">'+icon('edit',16)+'Edit</button>'
+    +'<button class="btn btn-danger btn-sm" data-action="del-exam" data-id="'+ex.id+'">'+icon('trash',16)+'Delete</button>'
+    +'</div></div>';
+}
+function renderExams(){
+  const el=$('#screen-exams');
+  const tags={academia:'The reading list',scandinavian:'Exams',cozy:'Coming up'};
+  const mast=masthead({
+    tag:tags[accent()],title:'Exams',
+    meta:metaLine([S.exams.length?pl(S.exams.length,'exam'):null,nextExam()?'next: <b>'+esc(nextExam().subject)+'</b> \u00b7 <b class="num">'+pl(daysLeft(nextExam()),'day')+'</b>':null]),
+    sub:S.exams.length?'Topics you mark as ready feed each exam\u2019s coverage. Re-plan folds new topics into the coming days.':'Track every exam, its topics and its date.',
+    actions:'<button class="btn btn-accent" data-action="add-exam">'+icon('plus',18)+'Add exam</button>',
+    illus:mastIllus()
+  });
+  if(!S.exams.length){ el.innerHTML=mast+emptyBlock(); return; }
+  el.innerHTML=mast+examsByDate().map(examPanelHTML).join('');
+}
+
+/* ============================= SETTINGS ============================= */
+const THEMES=[
+  {id:'academia',name:'Modern Dark Academia',desc:'Candlelit library \u2014 ink dark, parchment & antique gold.',
+   prev:['#141A17','#1D2522','#EFE6D2','#AD9565','#542B3A']},
+  {id:'scandinavian',name:'Clean Scandinavian',desc:'Calm, precise, airy \u2014 ice blue, slate & hairlines.',
+   prev:['#FBFBF9','#EEF0F1','#E8EEF2','#46697F','#2B3640']},
+  {id:'cozy',name:'Cozy Study Season',desc:'Warm paper season \u2014 cream, terracotta, mustard & sage.',
+   prev:['#FBF6EC','#FFFDF8','#EADFCB','#B4603A','#7C8F6B']}
+];
+function themePrev(p){
+  return '<span class="prev" style="background:'+p[0]+'">'
+    +'<i style="left:7px;top:8px;width:30px;height:42px;background:'+p[1]+'"></i>'
+    +'<i style="left:41px;top:14px;width:18px;height:36px;background:'+p[2]+'"></i>'
+    +'<i style="right:8px;top:8px;width:10px;height:10px;border-radius:50%;background:'+p[3]+'"></i>'
+    +'<i style="right:8px;bottom:8px;width:22px;height:8px;border-radius:3px;background:'+p[4]+'"></i>'
+    +'</span>';
+}
+function renderSettings(){
+  const el=$('#screen-settings');
+  const mast=masthead({
+    tag:'Make it yours',title:'Settings',
+    meta:metaLine(['saved locally in this browser','created '+fmtD(S.created,true)]),
+    sub:'Three complete looks. Switching themes is instant and survives reloads.',
+    illus:mastIllus()
+  });
+  const cards=THEMES.map(t=>
+    '<button class="themecard'+(S.theme===t.id?' on':'')+'" data-action="set-theme" data-theme="'+t.id+'">'
+    +themePrev(t.prev)
+    +'<span style="flex:1;min-width:0"><b>'+t.name+'</b><small>'+t.desc+'</small></span>'
+    +'<span class="tick">'+(S.theme===t.id?icon('check',14):'')+'</span>'
+    +'</button>').join('');
+  const modeSeg='<div class="seg" role="group" aria-label="Colour mode">'
+    +[['light','Light'],['dark','Dark'],['auto','Auto']].map(m=>'<button class="'+(S.mode===m[0]?'on':'')+'" data-action="set-mode" data-mode="'+m[0]+'"'+(S.theme==='academia'?' disabled style="opacity:.4"':'')+'>'+m[1]+'</button>').join('')
+    +'</div>';
+  el.innerHTML=mast
+    +'<div class="panel" style="margin-top:14px"><div class="panel-h"><span class="pic">'+icon('sun',18)+'</span><h3>Appearance</h3></div>'
+    +'<div class="themecards">'+cards+'</div>'
+    +'<div class="setrow" style="border-bottom:0"><div class="info"><b>Colour mode</b><small>'+(S.theme==='academia'?'Modern Dark Academia is always dark \u2014 it\u2019s the point.':'Applies to Scandinavian and Cozy. Auto follows your system.')+'</small></div>'+modeSeg+'</div></div>'
+    +'<div class="panel" style="margin-top:14px"><div class="panel-h"><span class="pic">'+icon('clock',18)+'</span><h3>Daily plan</h3></div>'
+    +'<div class="setrow"><div class="info"><b>Daily capacity</b><small>Realistic study hours per day used by re-planning.</small></div>'
+    +'<div style="display:flex;align-items:center;gap:10px"><button class="icon-btn lined" data-action="cap-delta" data-d="-1" aria-label="Decrease capacity">'+icon('minus',18)+'</button>'
+    +'<b class="num" style="min-width:52px;text-align:center;font-size:1.2rem">'+fmtH(S.capacity)+'</b>'
+    +'<button class="icon-btn lined" data-action="cap-delta" data-d="1" aria-label="Increase capacity">'+icon('plus',18)+'</button></div></div>'
+    +'<div class="setrow" style="border-bottom:0"><div class="info"><b>Bad day mode</b><small>Halves the daily load when re-planning \u2014 for days when 3 hours is not happening.</small></div>'
+    +'<button class="switch'+(S.badDay?' on':'')+'" data-action="toggle-badday" role="switch" aria-checked="'+S.badDay+'" aria-label="Bad day mode"></button></div></div>'
+    +'<div class="panel" style="margin-top:14px"><div class="panel-h"><span class="pic">'+icon('download',18)+'</span><h3>Data</h3></div>'
+    +'<div class="card-btns">'
+    +'<button class="btn btn-ghost" data-action="load-demo">'+icon('sparkle',18)+'Load demo data</button>'
+    +'<button class="btn btn-outline" data-action="export-ics">'+icon('calendar',18)+'Export .ics</button>'
+    +'<button class="btn btn-danger" data-action="reset-all">'+icon('trash',18)+'Reset all data</button>'
+    +'</div>'
+    +'<p class="tiny muted" style="margin-top:12px">Everything lives in your browser\u2019s local storage \u2014 nothing is sent anywhere. Loading the demo replaces your current plan; resetting cannot be undone.</p></div>';
+}
+</script>
+<script>
+'use strict';
+/* ============================== MODALS ============================== */
+function modalHead(title,extra){
+  return '<div class="modal-h">'+(extra||'')+'<h3>'+title+'</h3><button class="icon-btn x" data-action="close-modal" aria-label="Close">'+icon('x',20)+'</button></div>';
+}
+function openSession(sid){
+  const s=S.sessions.find(x=>x.id===sid); if(!s) return;
+  const ex=examById(s.examId); const p=partOf(s);
+  const ckd=s.checklist.filter(c=>c.done).length;
+  openModal(
+    modalHead('Study session',subjectChip(ex))
+    +'<h3 class="sess-title" style="font-size:1.3rem">'+esc(s.title)+'</h3>'
+    +'<div class="sess-meta"><span class="num">'+fmtD(s.date,true)+'</span><span class="num">'+fmtH(s.hours)+'</span><span>Part '+p.i+' of '+p.n+'</span><span>'+ckd+'/'+s.checklist.length+' checklist</span></div>'
+    +(s.checklist.length?'<div style="margin-top:14px">'+s.checklist.map(c=>
+        '<div class="checkrow"><button class="box '+(c.done?'on':'')+'" data-action="toggle-check" data-sid="'+s.id+'" data-cid="'+c.id+'" aria-label="Toggle item">'+icon('check',14)+'</button><span>'+esc(c.text)+'</span></div>').join('')+'</div>'
+      :'<p class="tiny muted" style="margin-top:14px">No checklist yet \u2014 break the session into steps below.</p>')
+    +'<div class="addcheck"><input id="check-in" data-sid="'+s.id+'" type="text" placeholder="Add a checklist step" aria-label="New checklist step"><button class="btn btn-ghost btn-sm" data-action="add-check-btn" data-sid="'+s.id+'">'+icon('plus',16)+'</button></div>'
+    +'<div class="field" style="margin-top:16px"><label for="notes-in">Notes</label><textarea id="notes-in" data-sid="'+s.id+'" placeholder="Key formulas, page numbers, what to revisit\u2026">'+esc(s.notes)+'</textarea></div>'
+    +'<div class="modal-foot">'
+    +'<button class="btn btn-primary" data-action="start-focus" data-id="'+s.id+'">'+icon('timer',18)+'Focus</button>'
+    +'<button class="btn btn-outline" data-action="mark-done-close" data-id="'+s.id+'">'+icon('check',18)+(s.done?'Undo done':'Mark Done')+'</button>'
+    +'<button class="btn btn-danger btn-sm" data-action="del-session" data-id="'+s.id+'" aria-label="Delete session">'+icon('trash',18)+'</button>'
+    +'</div>'
+  );
+  const ni=$('#notes-in');
+  if(ni){ let deb=null; ni.addEventListener('input',()=>{ clearTimeout(deb); deb=setTimeout(()=>saveNotes(ni.dataset.sid,ni.value),300); }); }
+  const ci=$('#check-in');
+  if(ci){ ci.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addCheck(ci.dataset.sid,ci.value); ci.value=''; } }); }
+}
+
+/* --------------------------- Focus timer --------------------------- */
+let F={sid:null,total:0,left:0,running:false,unlogged:0,spentAll:0,iv:null,last:0};
+function fmtMMSS(sec){ sec=Math.max(0,Math.round(sec)); return pad(Math.floor(sec/60))+':'+pad(sec%60); }
+function startFocus(sid){
+  const s=S.sessions.find(x=>x.id===sid); if(!s) return;
+  stopFocusTick();
+  F={sid,total:Math.max(300,Math.round(s.hours*3600)),left:0,running:false,unlogged:0,spentAll:0,iv:null,last:0};
+  F.left=F.total;
+  renderFocusModal(s);
+  F.iv=setInterval(()=>{ focusTick(); updateTimerUI(); },1000);
+  updateTimerUI();
+}
+function stopFocusTick(){ if(F.iv){ clearInterval(F.iv); F.iv=null; } }
+function logFocus(flush){
+  // FIX #9: keep leftover seconds; flush=true logs everything
+  const secs=flush?F.unlogged:Math.floor(F.unlogged/60)*60;
+  if(secs>0&&F.sid){
+    const t=tISO(); S.focusLog[t]=(S.focusLog[t]||0)+secs; F.unlogged-=secs; save();
+  }
+}
+// FIX #10: timer uses real clock time, so it stays accurate in background tabs
+function focusTick(){
+  if(!F.running) return;
+  const d=Math.floor((Date.now()-F.last)/1000);
+  if(d<1) return;
+  F.last+=d*1000; F.spentAll+=d; F.unlogged+=d; F.left=F.total-F.spentAll;
+  if(F.left<=0){
+    const over=-F.left;
+    if(over>0){ F.spentAll-=over; F.unlogged=Math.max(0,F.unlogged-over); }
+    F.left=0; F.running=false; logFocus(true); toast('Focus complete \u2014 nice work.');
+  }
+}
+function renderFocusModal(s){
+  const ex=examById(s.examId);
+  openModal(
+    modalHead('Focus session',subjectChip(ex))
+    +'<h3 class="sess-title" style="font-size:1.25rem;text-align:center">'+esc(s.title)+'</h3>'
+    +'<div class="timer-big num" id="tmrBig">'+fmtMMSS(F.left)+'</div>'
+    +'<p class="timer-sub" id="tmrSub">'+(F.running?'Focusing\u2026':'Paused')+' \u00b7 '+Math.round(F.spentAll/60)+' min focused \u00b7 planned '+fmtH(s.hours)+'</p>'
+    +'<div class="card-btns" style="justify-content:center">'
+    +'<button class="btn btn-primary" id="tmrToggle" data-action="focus-toggle">'+(F.running?icon('moon',18)+'Pause':icon('sun',18)+'Start')+'</button>'
+    +'<button class="btn btn-outline" data-action="focus-plus">'+icon('plus',18)+'5 min</button>'
+    +'<button class="btn btn-ghost" data-action="focus-end">End & log</button>'
+    +'</div>'
+    +'<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="mark-done-close" data-id="'+s.id+'">'+icon('check',18)+'Mark session done</button>'
+  );
+}
+function updateTimerUI(){
+  const b=$('#tmrBig'),sub=$('#tmrSub'),tog=$('#tmrToggle');
+  if(b) b.textContent=fmtMMSS(F.left);
+  if(sub) sub.textContent=(F.running?'Focusing\u2026':'Paused')+' \u00b7 '+Math.round(F.spentAll/60)+' min focused';
+  if(tog) tog.innerHTML=(F.running?icon('moon',18)+'Pause':icon('sun',18)+'Start');
+}
+
+/* ------------------------- Exam add / edit ------------------------- */
+function openExamModal(eid){
+  const ex=eid?examById(eid):null;
+  const color=ex?ex.color:EXAM_COLORS[0];
+  openModal(
+    modalHead(ex?'Edit exam':'Add exam')
+    +'<div class="field"><label for="exam-subject">Subject</label><input id="exam-subject" type="text" value="'+esc(ex?ex.subject:'')+'" placeholder="e.g. Mathematics"></div>'
+    +'<div class="field"><label for="exam-date">Exam date</label><input id="exam-date" type="date" value="'+(ex?ex.date:addD(tISO(),14))+'" min="'+tISO()+'"></div>'
+    +'<div class="field"><label>Colour</label><div class="swatches" id="exam-swatches">'
+    +EXAM_COLORS.map(c=>'<button class="swatch '+(c===color?'on':'')+'" data-c="'+c+'" style="background:'+c+'" aria-label="Colour '+c+'"></button>').join('')
+    +'</div></div>'
+    +(!ex?'<div class="field"><label for="exam-topics">Topics \u2014 one per line <span style="text-transform:none;letter-spacing:0">(name, hours)</span></label><textarea id="exam-topics" placeholder="Quadratic Equations, 3\nTrigonometry, 2.5"></textarea></div>':'')
+    +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Cancel</button>'
+    +'<button class="btn btn-primary" data-action="save-exam" data-id="'+(ex?ex.id:'')+'">'+icon('check',18)+(ex?'Save changes':'Add exam')+'</button></div>'
+  );
+  $$('#exam-swatches .swatch').forEach(b=>b.addEventListener('click',()=>{
+    $$('#exam-swatches .swatch').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  }));
+}
+function saveExam(eid){
+  const subj=$('#exam-subject').value.trim();
+  const date=$('#exam-date').value;
+  if(!subj){ toast('Give the exam a subject name.'); return; }
+  if(!date){ toast('Pick an exam date.'); return; }
+  const sw=$('#exam-swatches .swatch.on'); const color=sw?sw.dataset.c:EXAM_COLORS[0];
+  if(eid){
+    const ex=examById(eid); ex.subject=subj; ex.date=date; ex.color=color;
+    toast('Exam updated \u2014 re-plan to fit the new date.');
+  }else{
+    const topics=($('#exam-topics').value||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+      const m=l.match(/^(.*?)[,;]\s*(\d+(?:\.\d+)?)\s*h?$/); 
+      return m?{id:uid('tp'),name:m[1].trim(),hrs:clamp(parseFloat(m[2])||2,0.5,12),done:false}
+              :{id:uid('tp'),name:l,hrs:2,done:false};
+    });
+    S.exams.push({id:uid('ex'),subject:subj,date,color,topics});
+    toast('Exam added \u2014 now re-plan to generate study days.');
+  }
+  save(); closeModal(); renderAll();
+}
+function openSessionModal(eid){
+  const ex=examById(eid); if(!ex) return;
+  const opts=ex.topics.map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('')+'<option value="__custom">Custom\u2026</option>';
+  openModal(
+    modalHead('Add study session',subjectChip(ex))
+    +'<div class="field"><label for="ss-topic">Topic</label><select id="ss-topic">'+opts+'</select></div>'
+    +'<div class="field"><label for="ss-title">Title</label><input id="ss-title" type="text" value="'+esc(ex.topics[0]?ex.topics[0].name:'')+'" placeholder="What will you work on?"></div>'
+    +'<div class="field"><label for="ss-date">Date</label><input id="ss-date" type="date" value="'+tISO()+'" min="'+tISO()+'"></div>'
+    +'<div class="field"><label for="ss-hours">Hours</label><input id="ss-hours" type="number" value="1.5" min="0.5" max="8" step="0.5"></div>'
+    +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Cancel</button>'
+    +'<button class="btn btn-primary" data-action="save-session" data-eid="'+eid+'">'+icon('check',18)+'Add session</button></div>'
+  );
+  $('#ss-topic').addEventListener('change',e=>{
+    const t=ex.topics.find(x=>x.id===e.target.value);
+    $('#ss-title').value=t?t.name:'';
+  });
+}
+function confirmReplan(){
+  const poolN=S.sessions.filter(s=>!s.done).length;
+  const cap=Math.max(.5,S.capacity*(S.badDay?0.5:1));
+  openModal(
+    modalHead('Re-plan?')
+    +'<p style="font-size:.95rem">This moves <b class="num">'+poolN+'</b> unfinished session'+(poolN===1?'':'s')+(poolN?'':' (plus any new topics)')+' into balanced days up to your exams \u2014 about <b class="num">'+fmtH(cap)+'</b> per day'+(S.badDay?' (bad day mode is on)':'')+'. Finished sessions stay exactly where they are.</p>'
+    +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Cancel</button>'
+    +'<button class="btn btn-primary" data-action="do-replan">'+icon('refresh',18)+'Re-plan now</button></div>'
+  );
+}
+function confirmDemo(){
+  openModal(
+    modalHead('Load demo data?')
+    +'<p style="font-size:.95rem">This replaces your current exams and sessions with a sample plan (3 exams, 19 sessions, a 3-day streak). Your theme and capacity are kept.</p>'
+    +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Cancel</button>'
+    +'<button class="btn btn-primary" data-action="do-demo">'+icon('sparkle',18)+'Load demo</button></div>'
+  );
+}
+function confirmReset(){
+  openModal(
+    modalHead('Reset everything?')
+    +'<p style="font-size:.95rem">This permanently deletes all exams, sessions, XP and streak data from this browser. There is no undo.</p>'
+    +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Keep my data</button>'
+    +'<button class="btn btn-danger" data-action="do-reset">'+icon('trash',18)+'Delete everything</button></div>'
+  );
+}
+
+/* ============================== EVENTS ============================== */
+function addTopic(eid,value){
+  const ex=examById(eid); if(!ex||!value.trim()) return;
+  const m=value.trim().match(/^(.*?)[,;]\s*(\d+(?:\.\d+)?)\s*h?$/);
+  const name=m?m[1].trim():value.trim();
+  const hrs=m?clamp(parseFloat(m[2])||2,0.5,12):2;
+  ex.topics.push({id:uid('tp'),name,hrs,done:false});
+  save(); toast('Topic added'); renderAll();
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-action]');
+  if(!t) return;
+  const act=t.dataset.action, id=t.dataset.id;
+  switch(act){
+    case 'go': go(t.dataset.nav); break;
+    case 'replan': confirmReplan(); break;
+    case 'do-replan': closeModal(); replan(); break;
+    case 'export-ics': exportICS(); break;
+    case 'print-plan': window.print(); break;
+    case 'load-demo': confirmDemo(); break;
+    case 'do-demo': loadDemo(); closeModal(); break;
+    case 'reset-all': confirmReset(); break;
+    case 'do-reset': { const keep={theme:S.theme,mode:S.mode,capacity:S.capacity,badDay:S.badDay}; S=Object.assign(defaults(),keep); save(); applyMode(); closeModal(); renderAll(); toast('All data cleared.'); break; }
+    case 'mark-done': e.stopPropagation(); markDone(id); break;
+    case 'mark-done-close': e.stopPropagation(); markDone(id); closeModal(); break;
+    case 'open-session': openSession(id); break;
+    case 'start-focus': startFocus(id); break;
+    case 'focus-toggle':
+      if(F.running){ focusTick(); F.running=false; logFocus(false); }
+      else if(F.left<=0){ toast('Timer finished \u2014 tap +5 min to keep going.'); }
+      else{ F.running=true; F.last=Date.now(); }
+      updateTimerUI(); break;
+    case 'focus-plus': F.total+=300; F.left=F.total-F.spentAll; updateTimerUI(); break;
+    case 'focus-end': focusTick(); F.running=false; logFocus(true); toast('Focus time logged.'); closeModal(); renderAll(); break;
+    case 'toggle-check': toggleCheck(t.dataset.sid,t.dataset.cid); if(!$('#overlay').hidden) openSession(t.dataset.sid); break;
+    case 'add-check-btn': { const inp=$('#check-in'); if(inp){ addCheck(inp.dataset.sid,inp.value); const c2=$('#check-in'); if(c2) c2.value=''; } break; }
+    case 'close-modal': closeModal(); break;
+    case 'add-exam': openExamModal(''); break;
+    case 'edit-exam': openExamModal(id); break;
+    case 'save-exam': saveExam(id); break;
+    case 'del-exam': {
+      const ex=examById(id); if(!ex) break;
+      openModal(modalHead('Delete '+esc(ex.subject)+'?')
+        +'<p style="font-size:.95rem">Removes the exam, its topics and its sessions from the plan.</p>'
+        +'<div class="modal-foot"><button class="btn btn-outline" data-action="close-modal">Cancel</button>'
+        +'<button class="btn btn-danger" data-action="do-del-exam" data-id="'+id+'">'+icon('trash',18)+'Delete exam</button></div>');
+      break; }
+    case 'do-del-exam':
+      S.exams=S.exams.filter(x=>x.id!==id);
+      S.sessions=S.sessions.filter(s=>s.examId!==id);
+      save(); closeModal(); toast('Exam deleted'); renderAll(); break;
+    case 'toggle-topic': {
+      const ex2=examById(t.dataset.eid); const tp=ex2&&ex2.topics.find(x=>x.id===t.dataset.tid);
+      if(tp){ tp.done=!tp.done; save(); renderAll(); } break; }
+    case 'del-topic': {
+      const ex3=examById(t.dataset.eid);
+      if(ex3){ ex3.topics=ex3.topics.filter(x=>x.id!==t.dataset.tid); save(); renderAll(); } break; }
+    case 'add-topic': {
+      const inp=document.querySelector('.topic-in[data-eid="'+t.dataset.eid+'"]');
+      if(inp){ addTopic(t.dataset.eid,inp.value); } break; }
+    case 'add-session': openSessionModal(t.dataset.eid); break;
+    case 'save-session': {
+      const ex4=examById(t.dataset.eid); if(!ex4) break;
+      const tpid=$('#ss-topic').value; const title=$('#ss-title').value.trim();
+      const date=$('#ss-date').value||tISO(); const hours=clamp(parseFloat($('#ss-hours').value)||1.5,0.5,8);
+      if(!title){ toast('Give the session a title.'); break; }
+      S.sessions.push(newSession(ex4.id,tpid==='__custom'?null:tpid,title,hours,date));
+      save(); closeModal(); toast('Session added'); renderAll(); break; }
+    case 'set-theme': setTheme(t.dataset.theme); toast('Theme applied \u2014 '+(THEMES.find(x=>x.id===t.dataset.theme)||{name:t.dataset.theme}).name+'.'); break;
+    case 'set-mode': S.mode=t.dataset.mode; save(); applyMode(); renderAll(); break;
+    case 'cap-delta': S.capacity=clamp(S.capacity+parseInt(t.dataset.d,10),1,10); save(); renderAll(); break;
+    case 'toggle-badday': S.badDay=!S.badDay; save(); renderAll(); toast(S.badDay?'Bad day mode on \u2014 re-plan for a lighter load.':'Bad day mode off.'); break;
+    case 'view-today': go('today'); break;
+  }
+});
+$('#overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!$('#overlay').hidden) closeModal();
+  if(e.key==='Enter'&&e.target.matches&&e.target.matches('.topic-in')){ e.preventDefault(); addTopic(e.target.dataset.eid,e.target.value); }
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.donebtn')){ e.preventDefault(); markDone(e.target.dataset.id); } // FIX #12
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('[role="button"][data-action="go"]')){ e.preventDefault(); go(e.target.dataset.nav); }
+});
+
+/* ============================== ROUTER ============================== */
+const RENDERERS={today:renderToday,plan:renderPlan,progress:renderProgress,exams:renderExams,settings:renderSettings};
+function renderScreen(n){ (RENDERERS[n]||renderToday)(); }
+function renderAll(){ renderChrome(); renderScreen(S.screen||'today'); }
+function go(n){
+  if(!RENDERERS[n]) n='today';
+  S.screen=n; save();
+  $$('.screen').forEach(s=>s.classList.remove('active'));
+  $('#screen-'+n).classList.add('active');
+  renderChrome(); renderScreen(n);
+  window.scrollTo(0,0);
+}
+
+/* ============================== INIT ============================== */
+const FIRST_VISIT=(function(){ try{ return localStorage.getItem(LS_KEY)===null; }catch(e){ return true; } })();
+load();
+applyMode();
+if(FIRST_VISIT) loadDemo(); // DEMO: sample plan on first visit
+go(NAVS.some(x=>x[0]===S.screen)?S.screen:'today');
+</script>
+</body>
+</html>
